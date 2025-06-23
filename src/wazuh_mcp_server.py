@@ -1,261 +1,77 @@
 #!/usr/bin/env python3
 """
-Wazuh MCP Server for Claude Desktop Integration - Enhanced Edition
-------------------------------------------------------------------
+Wazuh MCP Server for Claude Desktop Integration - Production Edition
+-------------------------------------------------------------------
 Production-grade MCP server with advanced security analysis capabilities,
-multi-tool integration, and comprehensive threat intelligence features.
+comprehensive validation, and enterprise-ready features.
 """
 
 import os
 import sys
 import json
 import asyncio
-import logging
-import datetime
-import hashlib
-import re
-import ipaddress
-import statistics
-from typing import Dict, Any, Optional, List, Tuple, Set
-from dataclasses import dataclass, asdict
-from enum import Enum
-from collections import defaultdict, Counter
+import uuid
+from datetime import datetime
+from typing import Dict, Any, Optional, List
 
-import aiohttp
 import urllib3
 from mcp.server import Server, NotificationOptions
 from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 import mcp.types as types
 
-from config import WazuhConfig, AlertSeverity, ComplianceFramework, ThreatCategory
+from config import WazuhConfig, ComplianceFramework
+from __version__ import __version__
+from api.wazuh_client import WazuhAPIClient
+from analyzers import SecurityAnalyzer, ComplianceAnalyzer
+from utils import (
+    setup_logging, get_logger, LogContext,
+    validate_alert_query, validate_agent_query, validate_threat_analysis,
+    validate_ip_address, ValidationError,
+    WazuhMCPError, ConfigurationError, APIError
+)
 
 # Disable SSL warnings if VERIFY_SSL is false
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG if os.getenv("DEBUG", "false").lower() == "true" else logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    stream=sys.stderr
-)
-logger = logging.getLogger("wazuh-mcp")
-
-
-class WazuhAPIClient:
-    """Async Wazuh API client with JWT authentication"""
-    
-    def __init__(self, config: WazuhConfig):
-        self.config = config
-        self.jwt_token: Optional[str] = None
-        self.jwt_expiration: Optional[datetime.datetime] = None
-        self.session: Optional[aiohttp.ClientSession] = None
-    
-    async def __aenter__(self):
-        connector = aiohttp.TCPConnector(ssl=self.config.verify_ssl)
-        self.session = aiohttp.ClientSession(connector=connector)
-        return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session:
-            await self.session.close()
-    
-    def _is_jwt_valid(self) -> bool:
-        if not self.jwt_token or not self.jwt_expiration:
-            return False
-        remaining = (self.jwt_expiration - datetime.datetime.utcnow()).total_seconds()
-        return remaining > 60
-    
-    async def authenticate(self) -> str:
-        """Authenticate with Wazuh API and get JWT token"""
-        if self._is_jwt_valid():
-            return self.jwt_token
-        
-        auth_url = f"{self.config.base_url}/security/user/authenticate"
-        auth = aiohttp.BasicAuth(self.config.username, self.config.password)
-        
-        try:
-            logger.info(f"Authenticating with Wazuh API at {auth_url}")
-            async with self.session.get(auth_url, auth=auth) as response:
-                response.raise_for_status()
-                data = await response.json()
-                token = data.get("data", {}).get("token")
-                if not token:
-                    raise ValueError("JWT token not found in response")
-                
-                self.jwt_token = token
-                self.jwt_expiration = datetime.datetime.utcnow() + datetime.timedelta(minutes=14)
-                logger.info("Successfully authenticated with Wazuh API")
-                return self.jwt_token
-        except Exception as e:
-            logger.error(f"Authentication failed: {str(e)}")
-            raise
-    
-    async def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
-        """Make authenticated API request with automatic retry on 401"""
-        token = await self.authenticate()
-        headers = kwargs.pop("headers", {})
-        headers["Authorization"] = f"Bearer {token}"
-        
-        url = f"{self.config.base_url}{endpoint}"
-        
-        try:
-            async with self.session.request(method, url, headers=headers, **kwargs) as response:
-                if response.status == 401:
-                    logger.info("Token expired, re-authenticating...")
-                    self.jwt_token = None
-                    token = await self.authenticate()
-                    headers["Authorization"] = f"Bearer {token}"
-                    async with self.session.request(method, url, headers=headers, **kwargs) as retry_response:
-                        retry_response.raise_for_status()
-                        return await retry_response.json()
-                
-                response.raise_for_status()
-                return await response.json()
-        except Exception as e:
-            logger.error(f"API request failed: {str(e)}")
-            raise
-    
-    async def get_alerts(self, limit: int = 100, offset: int = 0, 
-                        level: Optional[int] = None, sort: str = "-timestamp") -> Dict[str, Any]:
-        """Get alerts from Wazuh"""
-        params = {
-            "limit": limit,
-            "offset": offset,
-            "sort": sort
-        }
-        if level is not None:
-            params["level"] = level
-        
-        return await self._request("GET", "/alerts", params=params)
-    
-    async def get_agents(self, status: Optional[str] = None) -> Dict[str, Any]:
-        """Get agent information"""
-        params = {}
-        if status:
-            params["status"] = status
-        return await self._request("GET", "/agents", params=params)
-    
-    async def get_agent_vulnerabilities(self, agent_id: str) -> Dict[str, Any]:
-        """Get vulnerabilities for a specific agent"""
-        return await self._request("GET", f"/vulnerability/{agent_id}")
-
-
-class ExternalAPIClient:
-    """Client for external security APIs"""
-    
-    def __init__(self, config: WazuhConfig):
-        self.config = config
-        self.session: Optional[aiohttp.ClientSession] = None
-    
-    async def __aenter__(self):
-        self.session = aiohttp.ClientSession()
-        return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session:
-            await self.session.close()
-    
-    async def check_ip_reputation(self, ip: str) -> Dict[str, Any]:
-        """Check IP reputation using AbuseIPDB"""
-        if not self.config.abuseipdb_api_key:
-            return {"error": "AbuseIPDB API key not configured"}
-        
-        url = "https://api.abuseipdb.com/api/v2/check"
-        headers = {
-            "Key": self.config.abuseipdb_api_key,
-            "Accept": "application/json"
-        }
-        params = {
-            "ipAddress": ip,
-            "maxAgeInDays": "90",
-            "verbose": True
-        }
-        
-        try:
-            async with self.session.get(url, headers=headers, params=params) as response:
-                response.raise_for_status()
-                return await response.json()
-        except Exception as e:
-            logger.error(f"AbuseIPDB API error: {str(e)}")
-            return {"error": str(e)}
-
-
-class SecurityAnalyzer:
-    """Advanced security analysis algorithms"""
-    
-    @staticmethod
-    def calculate_risk_score(alerts: List[Dict[str, Any]], 
-                           vulnerabilities: List[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Calculate comprehensive risk score based on multiple factors"""
-        risk_factors = {
-            "alert_severity": 0,
-            "alert_frequency": 0,
-            "vulnerability_score": 0,
-            "time_clustering": 0,
-            "attack_diversity": 0
-        }
-        
-        if not alerts:
-            return {"risk_score": 0, "risk_level": "low", "factors": risk_factors}
-        
-        # Alert severity scoring
-        severity_weights = {1: 0.1, 2: 0.2, 3: 0.3, 4: 0.4, 5: 0.5,
-                          6: 0.6, 7: 0.7, 8: 0.8, 9: 0.9, 10: 1.0,
-                          11: 1.2, 12: 1.4, 13: 1.6, 14: 1.8, 15: 2.0}
-        
-        total_severity = sum(severity_weights.get(alert.get("rule", {}).get("level", 0), 0) 
-                           for alert in alerts)
-        risk_factors["alert_severity"] = min(total_severity / len(alerts) * 50, 100)
-        
-        # Calculate final risk score
-        weights = {
-            "alert_severity": 0.3,
-            "alert_frequency": 0.2,
-            "vulnerability_score": 0.25,
-            "time_clustering": 0.15,
-            "attack_diversity": 0.1
-        }
-        
-        final_score = sum(risk_factors[factor] * weight 
-                         for factor, weight in weights.items())
-        
-        # Determine risk level
-        if final_score >= 80:
-            risk_level = "critical"
-        elif final_score >= 60:
-            risk_level = "high"
-        elif final_score >= 40:
-            risk_level = "medium"
-        else:
-            risk_level = "low"
-        
-        return {
-            "risk_score": round(final_score, 2),
-            "risk_level": risk_level,
-            "factors": risk_factors
-        }
-
 
 class WazuhMCPServer:
-    """Enhanced MCP Server implementation for Wazuh integration"""
+    """Production-grade MCP Server implementation for Wazuh integration."""
     
     def __init__(self):
+        # Initialize configuration first
+        try:
+            self.config = WazuhConfig.from_env()
+        except Exception as e:
+            raise ConfigurationError(f"Failed to load configuration: {str(e)}") from e
+        
+        # Setup logging with configuration
+        self.logger = setup_logging(
+            log_level=self.config.log_level,
+            log_dir="logs" if not self.config.debug else None,
+            enable_structured=True,
+            enable_rotation=True
+        )
+        
+        self.logger.info(f"Initializing Wazuh MCP Server v{__version__}")
+        
+        # Initialize components
         self.server = Server("wazuh-mcp")
-        self.config = WazuhConfig()
-        self.api_client: WazuhAPIClient = WazuhAPIClient(self.config)
-        # Revert external_client to its original state as its modification was not requested
-        self.external_client: Optional[ExternalAPIClient] = None
-        # Remove instantiation of SecurityAnalyzer as it only contains static methods
-        # self.security_analyzer = SecurityAnalyzer(self.config)
+        self.api_client = WazuhAPIClient(self.config)
+        self.security_analyzer = SecurityAnalyzer()
+        self.compliance_analyzer = ComplianceAnalyzer()
+        
+        # Setup handlers
         self._setup_handlers()
+        
+        self.logger.info("Wazuh MCP Server initialized successfully")
     
     def _setup_handlers(self):
-        """Setup MCP protocol handlers with enhanced capabilities"""
+        """Setup MCP protocol handlers with production-grade capabilities."""
         
         @self.server.list_resources()
         async def handle_list_resources() -> list[types.Resource]:
-            """List available Wazuh resources"""
+            """List available Wazuh resources."""
             return [
                 types.Resource(
                     uri="wazuh://alerts/recent",
@@ -286,77 +102,205 @@ class WazuhMCPServer:
                     name="Compliance Status",
                     description="Current compliance posture",
                     mimeType="application/json"
+                ),
+                types.Resource(
+                    uri="wazuh://threats/active",
+                    name="Active Threats",
+                    description="Currently active threat indicators",
+                    mimeType="application/json"
+                ),
+                types.Resource(
+                    uri="wazuh://system/health",
+                    name="System Health",
+                    description="Overall system health metrics",
+                    mimeType="application/json"
                 )
             ]
         
         @self.server.read_resource()
         async def handle_read_resource(uri: str) -> str:
-            """Read specific Wazuh resource"""
+            """Read specific Wazuh resource with comprehensive error handling."""
+            request_id = str(uuid.uuid4())
+            
             try:
-                # API client is now initialized in __init__ and session managed by run()
-                
-                if uri == "wazuh://alerts/recent":
-                    data = await self.api_client.get_alerts(limit=50)
-                    return json.dumps(self._format_alerts(data), indent=2)
-                
-                elif uri == "wazuh://agents/status":
-                    data = await self.api_client.get_agents()
-                    return json.dumps(self._format_agents(data), indent=2)
-                
-                else:
-                    raise ValueError(f"Unknown or unsupported resource URI: {uri}")
+                with LogContext(request_id):
+                    self.logger.info(f"Reading resource: {uri}")
                     
+                    if uri == "wazuh://alerts/recent":
+                        data = await self.api_client.get_alerts(limit=50)
+                        return json.dumps(self._format_alerts(data), indent=2)
+                    
+                    elif uri == "wazuh://alerts/summary":
+                        data = await self.api_client.get_alerts(limit=1000)
+                        summary = self._generate_alert_summary(data)
+                        return json.dumps(summary, indent=2)
+                    
+                    elif uri == "wazuh://agents/status":
+                        data = await self.api_client.get_agents()
+                        return json.dumps(self._format_agents(data), indent=2)
+                    
+                    elif uri == "wazuh://vulnerabilities/critical":
+                        agents_data = await self.api_client.get_agents(status="active")
+                        critical_vulns = await self._get_critical_vulnerabilities(agents_data)
+                        return json.dumps(critical_vulns, indent=2)
+                    
+                    elif uri == "wazuh://compliance/status":
+                        # Quick compliance overview
+                        agents_data = await self.api_client.get_agents()
+                        alerts_data = await self.api_client.get_alerts(limit=500)
+                        compliance_overview = await self._get_compliance_overview(agents_data, alerts_data)
+                        return json.dumps(compliance_overview, indent=2)
+                    
+                    elif uri == "wazuh://threats/active":
+                        alerts_data = await self.api_client.get_alerts(limit=500, time_range=3600)
+                        threat_summary = await self._get_active_threats(alerts_data)
+                        return json.dumps(threat_summary, indent=2)
+                    
+                    elif uri == "wazuh://system/health":
+                        health_data = await self.api_client.health_check()
+                        return json.dumps(health_data, indent=2)
+                    
+                    else:
+                        raise ValueError(f"Unknown or unsupported resource URI: {uri}")
+                        
             except Exception as e:
-                logger.error(f"Error reading resource {uri}: {str(e)}")
-                return json.dumps({"error": str(e)})
+                self.logger.error(f"Error reading resource {uri}: {str(e)}")
+                return json.dumps({"error": str(e), "request_id": request_id})
         
         @self.server.list_tools()
         async def handle_list_tools() -> list[types.Tool]:
-            """List available Wazuh tools"""
+            """List available Wazuh tools with comprehensive capabilities."""
             return [
                 types.Tool(
                     name="get_alerts",
-                    description="Retrieve Wazuh alerts with filtering options",
+                    description="Retrieve Wazuh alerts with advanced filtering and validation",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "limit": {
                                 "type": "integer",
                                 "description": "Maximum number of alerts to retrieve",
-                                "default": 100
+                                "default": 100,
+                                "minimum": 1,
+                                "maximum": 10000
                             },
                             "level": {
                                 "type": "integer",
                                 "description": "Minimum alert level (1-15)",
                                 "minimum": 1,
                                 "maximum": 15
+                            },
+                            "time_range": {
+                                "type": "integer",
+                                "description": "Time range in seconds (e.g., 3600 for last hour)",
+                                "minimum": 300,
+                                "maximum": 86400
+                            },
+                            "agent_id": {
+                                "type": "string",
+                                "description": "Filter alerts by specific agent ID"
                             }
                         }
                     }
                 ),
                 types.Tool(
                     name="analyze_threats",
-                    description="Perform advanced threat analysis on current alerts",
+                    description="Perform comprehensive threat analysis with ML-based risk assessment",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "category": {
                                 "type": "string",
                                 "description": "Threat category to analyze",
-                                "enum": ["all", "intrusion", "malware", "vulnerability"]
+                                "enum": ["all", "intrusion", "malware", "vulnerability", "compliance", "authentication"]
+                            },
+                            "time_range": {
+                                "type": "integer",
+                                "description": "Analysis time window in seconds",
+                                "default": 3600,
+                                "minimum": 300,
+                                "maximum": 86400
+                            },
+                            "include_patterns": {
+                                "type": "boolean",
+                                "description": "Include attack pattern detection",
+                                "default": False
                             }
                         }
                     }
                 ),
                 types.Tool(
                     name="check_agent_health",
-                    description="Check health status of Wazuh agents",
+                    description="Comprehensive agent health monitoring and diagnostics",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "agent_id": {
                                 "type": "string",
                                 "description": "Specific agent ID to check (optional)"
+                            },
+                            "include_stats": {
+                                "type": "boolean",
+                                "description": "Include detailed statistics",
+                                "default": False
+                            }
+                        }
+                    }
+                ),
+                types.Tool(
+                    name="compliance_check",
+                    description="Perform compliance assessment against security frameworks",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "framework": {
+                                "type": "string",
+                                "description": "Compliance framework to assess",
+                                "enum": ["pci_dss", "hipaa", "gdpr", "nist", "iso27001"]
+                            },
+                            "include_evidence": {
+                                "type": "boolean",
+                                "description": "Include detailed evidence and recommendations",
+                                "default": True
+                            }
+                        }
+                    }
+                ),
+                types.Tool(
+                    name="check_ioc",
+                    description="Check indicators of compromise against threat intelligence",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "ip_address": {
+                                "type": "string",
+                                "description": "IP address to check",
+                                "pattern": "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$"
+                            },
+                            "file_hash": {
+                                "type": "string",
+                                "description": "File hash to check (MD5, SHA1, or SHA256)"
+                            }
+                        }
+                    }
+                ),
+                types.Tool(
+                    name="risk_assessment",
+                    description="Comprehensive security risk assessment with recommendations",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "time_window_hours": {
+                                "type": "integer",
+                                "description": "Assessment time window in hours",
+                                "default": 24,
+                                "minimum": 1,
+                                "maximum": 168
+                            },
+                            "include_vulnerabilities": {
+                                "type": "boolean",
+                                "description": "Include vulnerability correlation",
+                                "default": True
                             }
                         }
                     }
@@ -365,79 +309,341 @@ class WazuhMCPServer:
         
         @self.server.call_tool()
         async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-            """Execute Wazuh tools with enhanced capabilities"""
+            """Execute Wazuh tools with comprehensive validation and error handling."""
+            request_id = str(uuid.uuid4())
+            
             try:
-                # API client is now initialized in __init__ and session managed by run()
-                
-                if name == "get_alerts":
-                    limit = arguments.get("limit", 100)
-                    level = arguments.get("level")
+                with LogContext(request_id):
+                    self.logger.info(f"Executing tool: {name}", extra={"details": arguments})
                     
-                    data = await self.api_client.get_alerts(limit=limit, level=level)
-                    formatted = self._format_alerts(data)
+                    if name == "get_alerts":
+                        return await self._handle_get_alerts(arguments)
                     
-                    return [types.TextContent(
-                        type="text",
-                        text=json.dumps(formatted, indent=2)
-                    )]
-                
-                elif name == "analyze_threats":
-                    category = arguments.get("category", "all")
-                    alerts_data = await self.api_client.get_alerts(limit=500)
-                    alerts = alerts_data.get("data", {}).get("affected_items", [])
+                    elif name == "analyze_threats":
+                        return await self._handle_analyze_threats(arguments)
                     
-                    # Perform risk analysis
-                    risk_assessment = SecurityAnalyzer.calculate_risk_score(alerts)
+                    elif name == "check_agent_health":
+                        return await self._handle_check_agent_health(arguments)
                     
-                    analysis = {
-                        "category": category,
-                        "total_alerts": len(alerts),
-                        "risk_assessment": risk_assessment,
-                        "timestamp": datetime.datetime.utcnow().isoformat()
-                    }
+                    elif name == "compliance_check":
+                        return await self._handle_compliance_check(arguments)
                     
-                    return [types.TextContent(
-                        type="text",
-                        text=json.dumps(analysis, indent=2)
-                    )]
-                
-                elif name == "check_agent_health":
-                    agent_id = arguments.get("agent_id")
-                    data = await self.api_client.get_agents()
-                    agents = data.get("data", {}).get("affected_items", [])
+                    elif name == "check_ioc":
+                        return await self._handle_check_ioc(arguments)
                     
-                    if agent_id:
-                        agent = next((a for a in agents if a["id"] == agent_id), None)
-                        if agent:
-                            health = self._assess_agent_health(agent)
-                            return [types.TextContent(
-                                type="text",
-                                text=json.dumps(health, indent=2)
-                            )]
-                        else: # Add this else block for when agent_id is not found
-                            return [types.TextContent(
-                                type="text",
-                                text=json.dumps({"error": f"Agent ID {agent_id} not found."})
-                            )]
+                    elif name == "risk_assessment":
+                        return await self._handle_risk_assessment(arguments)
+                    
                     else:
-                        health_report = self._assess_all_agents_health(data)
-                        return [types.TextContent(
-                            type="text",
-                            text=json.dumps(health_report, indent=2)
-                        )]
-                
-                else:
-                    raise ValueError(f"Unknown tool: {name}")
-                    
-            except Exception as e:
-                logger.error(f"Error executing tool {name}: {str(e)}")
+                        raise ValueError(f"Unknown tool: {name}")
+                        
+            except ValidationError as e:
+                self.logger.warning(f"Validation error in tool {name}: {str(e)}")
                 return [types.TextContent(
                     type="text",
-                    text=json.dumps({"error": str(e)})
+                    text=json.dumps({"error": f"Validation error: {str(e)}", "request_id": request_id})
+                )]
+            except Exception as e:
+                self.logger.error(f"Error executing tool {name}: {str(e)}")
+                return [types.TextContent(
+                    type="text",
+                    text=json.dumps({"error": str(e), "request_id": request_id})
                 )]
     
+    async def _handle_get_alerts(self, arguments: dict) -> list[types.TextContent]:
+        """Handle get_alerts tool execution."""
+        # Validate parameters
+        validated_query = validate_alert_query(arguments)
+        
+        data = await self.api_client.get_alerts(
+            limit=validated_query.limit,
+            level=arguments.get("level"),
+            time_range=arguments.get("time_range"),
+            agent_id=arguments.get("agent_id")
+        )
+        
+        formatted = self._format_alerts(data)
+        
+        return [types.TextContent(
+            type="text",
+            text=json.dumps(formatted, indent=2)
+        )]
+    
+    async def _handle_analyze_threats(self, arguments: dict) -> list[types.TextContent]:
+        """Handle threat analysis tool execution."""
+        validated_query = validate_threat_analysis(arguments)
+        
+        # Get alerts for analysis
+        alerts_data = await self.api_client.get_alerts(
+            limit=1000, 
+            time_range=validated_query.time_range
+        )
+        alerts = alerts_data.get("data", {}).get("affected_items", [])
+        
+        # Perform risk assessment
+        risk_assessment = self.security_analyzer.calculate_comprehensive_risk_score(
+            alerts, time_window_hours=validated_query.time_range // 3600
+        )
+        
+        analysis = {
+            "category": validated_query.category,
+            "total_alerts": len(alerts),
+            "time_range_seconds": validated_query.time_range,
+            "risk_assessment": {
+                "overall_score": risk_assessment.overall_score,
+                "risk_level": risk_assessment.risk_level.value,
+                "confidence": risk_assessment.confidence,
+                "factors": [
+                    {
+                        "name": factor.name,
+                        "score": factor.score,
+                        "weight": factor.weight,
+                        "description": factor.description
+                    }
+                    for factor in risk_assessment.factors
+                ],
+                "recommendations": risk_assessment.recommendations
+            },
+            "timestamp": risk_assessment.timestamp.isoformat()
+        }
+        
+        # Include attack patterns if requested
+        if arguments.get("include_patterns", False):
+            patterns = self.security_analyzer.detect_attack_patterns(alerts)
+            analysis["attack_patterns"] = patterns
+        
+        return [types.TextContent(
+            type="text",
+            text=json.dumps(analysis, indent=2)
+        )]
+    
+    async def _handle_check_agent_health(self, arguments: dict) -> list[types.TextContent]:
+        """Handle agent health check tool execution."""
+        agent_id = arguments.get("agent_id")
+        include_stats = arguments.get("include_stats", False)
+        
+        if agent_id:
+            # Validate agent query
+            validated_query = validate_agent_query({"agent_id": agent_id})
+            
+            # Get specific agent data
+            agents_data = await self.api_client.get_agents()
+            agents = agents_data.get("data", {}).get("affected_items", [])
+            agent = next((a for a in agents if a["id"] == agent_id), None)
+            
+            if not agent:
+                return [types.TextContent(
+                    type="text",
+                    text=json.dumps({"error": f"Agent ID {agent_id} not found."})
+                )]
+            
+            health = self._assess_agent_health(agent)
+            
+            if include_stats:
+                try:
+                    stats = await self.api_client.get_agent_stats(agent_id)
+                    health["statistics"] = stats.get("data", {})
+                except Exception as e:
+                    health["statistics_error"] = str(e)
+            
+            return [types.TextContent(
+                type="text",
+                text=json.dumps(health, indent=2)
+            )]
+        else:
+            # Get all agents health
+            data = await self.api_client.get_agents()
+            health_report = self._assess_all_agents_health(data)
+            
+            return [types.TextContent(
+                type="text",
+                text=json.dumps(health_report, indent=2)
+            )]
+    
+    async def _handle_compliance_check(self, arguments: dict) -> list[types.TextContent]:
+        """Handle compliance check tool execution."""
+        framework_str = arguments.get("framework", "pci_dss")
+        include_evidence = arguments.get("include_evidence", True)
+        
+        # Map string to enum
+        framework_map = {
+            "pci_dss": ComplianceFramework.PCI_DSS,
+            "hipaa": ComplianceFramework.HIPAA,
+            "gdpr": ComplianceFramework.GDPR,
+            "nist": ComplianceFramework.NIST,
+            "iso27001": ComplianceFramework.ISO27001
+        }
+        
+        framework = framework_map.get(framework_str, ComplianceFramework.PCI_DSS)
+        
+        # Gather data for compliance assessment
+        alerts_data = await self.api_client.get_alerts(limit=1000)
+        alerts = alerts_data.get("data", {}).get("affected_items", [])
+        
+        agents_data = await self.api_client.get_agents()
+        agents = agents_data.get("data", {}).get("affected_items", [])
+        
+        # Get vulnerabilities for a sample of agents
+        vulnerabilities = []
+        active_agents = [a for a in agents if a.get("status") == "active"][:5]  # Sample 5 agents
+        
+        for agent in active_agents:
+            try:
+                vuln_data = await self.api_client.get_agent_vulnerabilities(agent["id"])
+                agent_vulns = vuln_data.get("data", {}).get("affected_items", [])
+                vulnerabilities.extend(agent_vulns)
+            except Exception as e:
+                self.logger.warning(f"Could not get vulnerabilities for agent {agent['id']}: {str(e)}")
+        
+        # Perform compliance assessment
+        report = self.compliance_analyzer.assess_compliance(
+            framework, alerts, agents, vulnerabilities
+        )
+        
+        # Format response
+        compliance_result = {
+            "framework": framework.value,
+            "overall_score": report.overall_score,
+            "status": report.status.value,
+            "summary": report.summary,
+            "timestamp": report.timestamp.isoformat()
+        }
+        
+        if include_evidence:
+            compliance_result["requirements"] = [
+                {
+                    "id": req.id,
+                    "title": req.title,
+                    "description": req.description,
+                    "status": req.status.value,
+                    "score": req.score,
+                    "evidence": req.evidence,
+                    "gaps": req.gaps,
+                    "recommendations": req.recommendations
+                }
+                for req in report.requirements
+            ]
+            compliance_result["recommendations"] = report.recommendations
+        
+        return [types.TextContent(
+            type="text",
+            text=json.dumps(compliance_result, indent=2)
+        )]
+    
+    async def _handle_check_ioc(self, arguments: dict) -> list[types.TextContent]:
+        """Handle IOC checking tool execution."""
+        ip_address = arguments.get("ip_address")
+        file_hash = arguments.get("file_hash")
+        
+        results = {"indicators": []}
+        
+        if ip_address:
+            try:
+                validated_ip = validate_ip_address(ip_address)
+                # For now, just return structure - external API integration would go here
+                results["indicators"].append({
+                    "type": "ip_address",
+                    "value": validated_ip.ip,
+                    "status": "not_implemented",
+                    "message": "External threat intelligence integration not configured"
+                })
+            except ValidationError as e:
+                results["indicators"].append({
+                    "type": "ip_address",
+                    "value": ip_address,
+                    "status": "error",
+                    "message": str(e)
+                })
+        
+        if file_hash:
+            try:
+                from utils.validation import validate_file_hash
+                validated_hash = validate_file_hash(file_hash)
+                results["indicators"].append({
+                    "type": "file_hash",
+                    "value": validated_hash.hash_value,
+                    "hash_type": validated_hash.hash_type,
+                    "status": "not_implemented",
+                    "message": "External threat intelligence integration not configured"
+                })
+            except ValidationError as e:
+                results["indicators"].append({
+                    "type": "file_hash",
+                    "value": file_hash,
+                    "status": "error",
+                    "message": str(e)
+                })
+        
+        if not results["indicators"]:
+            results["error"] = "No valid indicators provided"
+        
+        return [types.TextContent(
+            type="text",
+            text=json.dumps(results, indent=2)
+        )]
+    
+    async def _handle_risk_assessment(self, arguments: dict) -> list[types.TextContent]:
+        """Handle comprehensive risk assessment tool execution."""
+        time_window_hours = arguments.get("time_window_hours", 24)
+        include_vulnerabilities = arguments.get("include_vulnerabilities", True)
+        
+        # Get alerts for the time window
+        time_range_seconds = time_window_hours * 3600
+        alerts_data = await self.api_client.get_alerts(
+            limit=2000, 
+            time_range=time_range_seconds
+        )
+        alerts = alerts_data.get("data", {}).get("affected_items", [])
+        
+        vulnerabilities = []
+        if include_vulnerabilities:
+            # Get sample of vulnerabilities
+            agents_data = await self.api_client.get_agents(status="active")
+            active_agents = agents_data.get("data", {}).get("affected_items", [])[:10]  # Sample 10 agents
+            
+            for agent in active_agents:
+                try:
+                    vuln_data = await self.api_client.get_agent_vulnerabilities(agent["id"])
+                    agent_vulns = vuln_data.get("data", {}).get("affected_items", [])
+                    vulnerabilities.extend(agent_vulns)
+                except Exception as e:
+                    self.logger.warning(f"Could not get vulnerabilities for agent {agent['id']}: {str(e)}")
+        
+        # Perform comprehensive risk assessment
+        risk_assessment = self.security_analyzer.calculate_comprehensive_risk_score(
+            alerts, vulnerabilities, time_window_hours
+        )
+        
+        # Format result
+        result = {
+            "assessment_period": {
+                "time_window_hours": time_window_hours,
+                "alerts_analyzed": len(alerts),
+                "vulnerabilities_analyzed": len(vulnerabilities)
+            },
+            "risk_score": risk_assessment.overall_score,
+            "risk_level": risk_assessment.risk_level.value,
+            "confidence": risk_assessment.confidence,
+            "factors": [
+                {
+                    "name": factor.name,
+                    "score": factor.score,
+                    "weight": factor.weight,
+                    "description": factor.description
+                }
+                for factor in risk_assessment.factors
+            ],
+            "recommendations": risk_assessment.recommendations,
+            "timestamp": risk_assessment.timestamp.isoformat()
+        }
+        
+        return [types.TextContent(
+            type="text",
+            text=json.dumps(result, indent=2)
+        )]
+    
     def _format_alerts(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Format alerts for better readability"""
+        """Format alerts for better readability."""
         alerts = data.get("data", {}).get("affected_items", [])
         
         formatted_alerts = []
@@ -462,11 +668,11 @@ class WazuhMCPServer:
         return {
             "total_alerts": data.get("data", {}).get("total_affected_items", 0),
             "alerts": formatted_alerts,
-            "query_time": datetime.datetime.utcnow().isoformat()
+            "query_time": datetime.utcnow().isoformat()
         }
     
     def _format_agents(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Format agent data with enhanced metrics"""
+        """Format agent data with enhanced metrics."""
         agents = data.get("data", {}).get("affected_items", [])
         
         status_summary = {
@@ -499,7 +705,7 @@ class WazuhMCPServer:
         }
     
     def _assess_agent_health(self, agent: Dict[str, Any]) -> Dict[str, Any]:
-        """Assess health of a single agent"""
+        """Assess health of a single agent."""
         status = agent.get("status", "unknown")
         health_status = "healthy" if status == "active" else "unhealthy"
         
@@ -511,12 +717,13 @@ class WazuhMCPServer:
             "details": {
                 "ip": agent.get("ip"),
                 "os": agent.get("os", {}).get("platform"),
-                "version": agent.get("version")
+                "version": agent.get("version"),
+                "last_keep_alive": agent.get("lastKeepAlive")
             }
         }
     
     def _assess_all_agents_health(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Assess health of all agents"""
+        """Assess health of all agents."""
         agents = data.get("data", {}).get("affected_items", [])
         
         health_report = {
@@ -541,63 +748,190 @@ class WazuhMCPServer:
         
         return health_report
     
+    def _generate_alert_summary(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate statistical summary of alerts."""
+        alerts = data.get("data", {}).get("affected_items", [])
+        
+        if not alerts:
+            return {"message": "No alerts to summarize"}
+        
+        # Basic statistics
+        total_alerts = len(alerts)
+        levels = [alert.get("rule", {}).get("level", 0) for alert in alerts]
+        
+        summary = {
+            "total_alerts": total_alerts,
+            "severity_distribution": {
+                "low": len([l for l in levels if 1 <= l <= 5]),
+                "medium": len([l for l in levels if 6 <= l <= 10]),
+                "high": len([l for l in levels if 11 <= l <= 15])
+            },
+            "top_rules": {},
+            "top_agents": {},
+            "time_analysis": {}
+        }
+        
+        # Top rules
+        rule_counter = {}
+        for alert in alerts:
+            rule_id = alert.get("rule", {}).get("id")
+            if rule_id:
+                rule_counter[rule_id] = rule_counter.get(rule_id, 0) + 1
+        
+        summary["top_rules"] = dict(sorted(rule_counter.items(), key=lambda x: x[1], reverse=True)[:10])
+        
+        # Top agents
+        agent_counter = {}
+        for alert in alerts:
+            agent_id = alert.get("agent", {}).get("id")
+            if agent_id:
+                agent_counter[agent_id] = agent_counter.get(agent_id, 0) + 1
+        
+        summary["top_agents"] = dict(sorted(agent_counter.items(), key=lambda x: x[1], reverse=True)[:10])
+        
+        return summary
+    
+    async def _get_critical_vulnerabilities(self, agents_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Get critical vulnerabilities across agents."""
+        agents = agents_data.get("data", {}).get("affected_items", [])
+        active_agents = [a for a in agents if a.get("status") == "active"][:10]  # Limit to 10 agents
+        
+        critical_vulns = []
+        
+        for agent in active_agents:
+            try:
+                vuln_data = await self.api_client.get_agent_vulnerabilities(agent["id"])
+                vulns = vuln_data.get("data", {}).get("affected_items", [])
+                
+                for vuln in vulns:
+                    severity = vuln.get("severity", "").lower()
+                    if severity in ["critical", "high"]:
+                        critical_vulns.append({
+                            "agent_id": agent["id"],
+                            "agent_name": agent.get("name"),
+                            "vulnerability": vuln.get("title"),
+                            "severity": severity,
+                            "cve": vuln.get("cve", "N/A")
+                        })
+                        
+            except Exception as e:
+                self.logger.warning(f"Could not get vulnerabilities for agent {agent['id']}: {str(e)}")
+        
+        return {
+            "total_critical_vulnerabilities": len(critical_vulns),
+            "vulnerabilities": critical_vulns[:50],  # Limit response size
+            "agents_checked": len(active_agents)
+        }
+    
+    async def _get_compliance_overview(self, agents_data: Dict[str, Any], alerts_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Get quick compliance overview."""
+        agents = agents_data.get("data", {}).get("affected_items", [])
+        alerts = alerts_data.get("data", {}).get("affected_items", [])
+        
+        # Simple compliance metrics
+        total_agents = len(agents)
+        active_agents = len([a for a in agents if a.get("status") == "active"])
+        
+        # Alert severity analysis
+        high_severity_alerts = len([a for a in alerts if a.get("rule", {}).get("level", 0) >= 10])
+        
+        coverage_score = (active_agents / total_agents * 100) if total_agents > 0 else 0
+        
+        return {
+            "agent_coverage": {
+                "total_agents": total_agents,
+                "active_agents": active_agents,
+                "coverage_percentage": round(coverage_score, 1)
+            },
+            "alert_analysis": {
+                "total_alerts": len(alerts),
+                "high_severity_alerts": high_severity_alerts
+            },
+            "compliance_score": round(max(0, 100 - (high_severity_alerts * 2) - (100 - coverage_score)), 1),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
+    async def _get_active_threats(self, alerts_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Get active threat summary."""
+        alerts = alerts_data.get("data", {}).get("affected_items", [])
+        
+        if not alerts:
+            return {"message": "No recent threats detected"}
+        
+        # Analyze patterns
+        patterns = self.security_analyzer.detect_attack_patterns(alerts)
+        
+        # Get threat categories
+        threat_categories = {}
+        for alert in alerts:
+            groups = alert.get("rule", {}).get("groups", [])
+            for group in groups:
+                if any(keyword in group.lower() for keyword in 
+                      ["attack", "intrusion", "malware", "exploit", "breach"]):
+                    threat_categories[group] = threat_categories.get(group, 0) + 1
+        
+        return {
+            "total_recent_alerts": len(alerts),
+            "detected_patterns": patterns.get("detected_patterns", {}),
+            "threat_categories": dict(sorted(threat_categories.items(), key=lambda x: x[1], reverse=True)[:10]),
+            "analysis_window": "Last hour",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
     async def run(self):
-        """Run the MCP server with robust client lifecycle management."""
+        """Run the MCP server with robust error handling and logging."""
         try:
-            logger.info("Initializing API client session...")
-            await self.api_client.__aenter__() # Open WazuhAPIClient session
-
-            # If external_client were to be used and mandatory for server operation:
-            # logger.info("Initializing External API client session...")
-            # await self.external_client.__aenter__() # Assuming external_client is also non-optional
-
-            logger.info("Wazuh MCP Server (Enhanced Edition) starting...")
-            logger.info(f"Connecting to Wazuh at {self.config.base_url}")
+            self.logger.info("Starting Wazuh MCP Server session...")
+            await self.api_client.__aenter__()
+            
+            self.logger.info(f"Wazuh MCP Server v{__version__} starting...")
+            self.logger.info(f"Connecting to Wazuh at {self.config.base_url}")
+            
+            # Test connection
+            health_data = await self.api_client.health_check()
+            if health_data.get("status") != "healthy":
+                raise ConnectionError(f"Wazuh API health check failed: {health_data}")
+            
+            self.logger.info("Wazuh API connection verified successfully")
             
             init_options = InitializationOptions(
                 server_name="wazuh-mcp",
-                server_version="2.0.0", # Consider updating if features change significantly
+                server_version=__version__,
                 capabilities=self.server.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={}
                 )
             )
             
-            # stdio_server itself is an async context manager
             async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
                 await self.server.run(
                     read_stream,
                     write_stream,
                     init_options
                 )
-
+                
         except Exception as e:
-            # This will catch errors from __aenter__ calls, stdio_server setup,
-            # or self.server.run()
-            logger.error(f"Server runtime error: {str(e)}")
-            raise # Re-raise to be caught by main() for sys.exit(1)
+            self.logger.error(f"Server runtime error: {str(e)}")
+            raise
         finally:
-            # Ensure resources are cleaned up
-            logger.info("Shutting down. Attempting to close API client session...")
-            # WazuhAPIClient.__aexit__ is safe to call (checks if self.session exists)
+            self.logger.info("Shutting down Wazuh MCP Server...")
             await self.api_client.__aexit__(None, None, None)
-
-            # If external_client were used:
-            # if self.external_client: # Check if it was initialized
-            #     logger.info("Attempting to close External API client session...")
-            #     await self.external_client.__aexit__(None, None, None)
-            logger.info("Server cleanup finished.")
+            self.logger.info("Server shutdown completed")
 
 
 async def main():
-    """Main entry point"""
+    """Main entry point with comprehensive error handling."""
     try:
         server = WazuhMCPServer()
         await server.run()
     except KeyboardInterrupt:
-        logger.info("Server shutdown requested")
+        print("Server shutdown requested")
+    except ConfigurationError as e:
+        print(f"Configuration error: {str(e)}")
+        print("Please check your .env file and environment variables")
+        sys.exit(1)
     except Exception as e:
-        logger.error(f"Fatal error: {str(e)}")
+        print(f"Fatal error: {str(e)}")
         sys.exit(1)
 
 

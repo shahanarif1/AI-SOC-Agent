@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="wazuh-mcp-server",
-    version="2.0.0",
+    version="1.1.0",
     author="Security Team",
     description="MCP server for Wazuh SIEM integration",
     long_description=long_description,
@@ -18,10 +18,14 @@ setup(
         "aiohttp>=3.9.0",
         "urllib3>=2.0.0",
         "python-dateutil>=2.8.2",
+        "python-dotenv>=1.0.0",
+        "pydantic>=2.0.0",
+        "pytest>=7.0.0",
+        "pytest-asyncio>=0.21.0",
     ],
     entry_points={
         "console_scripts": [
-            "wazuh-mcp-server=wazuh_mcp_server:main",
+            "wazuh-mcp-server=src.wazuh_mcp_server:main",
         ],
     },
 )

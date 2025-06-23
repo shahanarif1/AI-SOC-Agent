@@ -18,4 +18,7 @@ USER mcp
 
 ENV PYTHONUNBUFFERED=1
 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python /app/src/health_check.py || exit 1
+
 CMD ["python", "src/wazuh_mcp_server.py"]

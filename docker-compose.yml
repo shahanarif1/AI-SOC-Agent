@@ -66,9 +66,9 @@ services:
         max-file: "3"
         labels: "service=wazuh-mcp"
     
-    # Health check
+    # Health check (using application-specific health check)
     healthcheck:
-      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      test: ["CMD", "python", "/app/src/health_check.py"]
       interval: 30s
       timeout: 10s
       retries: 3
