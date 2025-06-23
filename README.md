@@ -1,4 +1,4 @@
-# 🛡️ Wazuh MCP Server - AI-Powered Security Operations
+# 🛡️ Wazuh MCP Server - AI-Powered Security Operations v1.1.0
 
 <div align="center">
 
@@ -227,7 +227,7 @@ pytest
 
 - [Discussions](https://github.com/gensecaihq/Wazuh-MCP-Server/discussions/)
 - [Issue Tracker](https://github.com/gensecaihq/wazuh-mcp-server/issues)
-- 
+
 
 ## 📄 License
 
