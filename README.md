@@ -1,11 +1,12 @@
-# 🛡️ Wazuh MCP Server - AI-Powered Security Operations v1.1.0
+# 🛡️ Wazuh MCP Server - AI-Powered Security Operations v2.1.0
 
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
-[![Wazuh 4.x](https://img.shields.io/badge/Wazuh-4.x-blue.svg)](https://wazuh.com/)
+[![Wazuh 4.8.0+](https://img.shields.io/badge/Wazuh-4.8.0+-blue.svg)](https://wazuh.com/)
+[![Production Ready](https://img.shields.io/badge/Status-Production%20Ready-success.svg)](https://github.com/gensecaihq/Wazuh-MCP-Server)
 [![Claude Desktop](https://img.shields.io/badge/Claude-Desktop-purple.svg)](https://claude.ai/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 

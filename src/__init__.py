@@ -1,7 +1,5 @@
-"""Wazuh MCP Server Package"""
+"""Wazuh MCP Server Package - Production Edition for Wazuh 4.8.0+"""
 
-__version__ = "2.0.0"
+from .__version__ import __version__, __min_wazuh_version__, __recommended_wazuh_version__
 
-from .wazuh_mcp_server import WazuhMCPServer, main
-
-__all__ = ["WazuhMCPServer", "main"]
+__all__ = ["__version__", "__min_wazuh_version__", "__recommended_wazuh_version__"]

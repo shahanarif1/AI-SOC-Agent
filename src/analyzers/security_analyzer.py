@@ -167,9 +167,19 @@ class SecurityAnalyzer:
         for alert in alerts:
             try:
                 timestamp_str = alert.get("timestamp", "")
-                timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                if not timestamp_str:
+                    continue
+                
+                # Handle various timestamp formats safely
+                if timestamp_str.endswith("Z"):
+                    timestamp_str = timestamp_str[:-1] + "+00:00"
+                elif "+" not in timestamp_str and "Z" not in timestamp_str:
+                    timestamp_str += "+00:00"
+                
+                timestamp = datetime.fromisoformat(timestamp_str)
                 timestamps.append(timestamp)
-            except:
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.warning(f"Failed to parse timestamp '{timestamp_str}': {e}")
                 continue
         
         if len(timestamps) < 2:

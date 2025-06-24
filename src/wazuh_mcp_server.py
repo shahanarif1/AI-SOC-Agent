@@ -22,7 +22,7 @@ import mcp.types as types
 
 from config import WazuhConfig, ComplianceFramework
 from __version__ import __version__
-from api.wazuh_client import WazuhAPIClient
+from api.wazuh_client_manager import WazuhClientManager
 from analyzers import SecurityAnalyzer, ComplianceAnalyzer
 from utils import (
     setup_logging, get_logger, LogContext,
@@ -31,8 +31,8 @@ from utils import (
     WazuhMCPError, ConfigurationError, APIError
 )
 
-# Disable SSL warnings if VERIFY_SSL is false
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# SSL warnings will be disabled per-request basis in clients if needed
+# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # SECURITY: Removed global disable
 
 
 class WazuhMCPServer:
@@ -57,7 +57,7 @@ class WazuhMCPServer:
         
         # Initialize components
         self.server = Server("wazuh-mcp")
-        self.api_client = WazuhAPIClient(self.config)
+        self.api_client = WazuhClientManager(self.config)
         self.security_analyzer = SecurityAnalyzer()
         self.compliance_analyzer = ComplianceAnalyzer()
         
@@ -65,6 +65,18 @@ class WazuhMCPServer:
         self._setup_handlers()
         
         self.logger.info("Wazuh MCP Server initialized successfully")
+    
+    async def initialize_connections(self):
+        """Initialize connections and detect Wazuh version."""
+        try:
+            async with self.api_client as client:
+                version = await client.detect_wazuh_version()
+                if version:
+                    self.logger.info(f"Connected to Wazuh {version}")
+                else:
+                    self.logger.warning("Could not detect Wazuh version")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize connections: {str(e)}")
     
     def _setup_handlers(self):
         """Setup MCP protocol handlers with production-grade capabilities."""
@@ -429,7 +441,7 @@ class WazuhMCPServer:
             # Get specific agent data
             agents_data = await self.api_client.get_agents()
             agents = agents_data.get("data", {}).get("affected_items", [])
-            agent = next((a for a in agents if a["id"] == agent_id), None)
+            agent = next((a for a in agents if a.get("id") == agent_id), None)
             
             if not agent:
                 return [types.TextContent(

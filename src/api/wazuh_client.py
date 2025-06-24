@@ -290,14 +290,14 @@ class WazuhAPIClient:
     
     @log_performance
     async def get_agent_vulnerabilities(self, agent_id: str) -> Dict[str, Any]:
-        """Get vulnerabilities for a specific agent."""
+        """Get vulnerabilities for a specific agent (deprecated in 4.8.0+)."""
         
         # Sanitize and validate agent ID
         clean_agent_id = sanitize_string(agent_id, 20)
         if not clean_agent_id:
             raise ValueError("Invalid agent ID")
         
-        logger.info(f"Fetching vulnerabilities for agent {clean_agent_id}")
+        logger.warning(f"Using deprecated vulnerability endpoint for agent {clean_agent_id} - consider upgrading to Wazuh 4.8.0+ and using Indexer API")
         
         return await self._request("GET", f"/vulnerability/{clean_agent_id}")
     

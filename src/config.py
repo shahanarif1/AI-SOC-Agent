@@ -5,7 +5,30 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
+from pathlib import Path
 from pydantic import BaseModel, validator, Field
+from dotenv import load_dotenv
+
+# Find .env file - works on both Windows and Linux
+# First try current directory, then parent directories
+current_dir = Path(__file__).resolve().parent
+env_file = None
+
+# Search for .env file in current and parent directories
+for parent in [current_dir, current_dir.parent, current_dir.parent.parent]:
+    potential_env = parent / '.env'
+    if potential_env.exists():
+        env_file = potential_env
+        break
+
+# Load environment variables from .env file if found
+if env_file:
+    load_dotenv(dotenv_path=env_file)
+    logging.info(f"Loaded .env file from: {env_file}")
+else:
+    # Try loading from current working directory as fallback
+    load_dotenv()
+    logging.debug("No .env file found in parent directories, trying current working directory")
 
 
 class AlertSeverity(Enum):
@@ -42,13 +65,25 @@ class ConfigurationError(Exception):
 class WazuhConfig(BaseModel):
     """Validated Wazuh configuration with security best practices."""
     
-    # Required Wazuh settings - no defaults for security
+    # Required Wazuh Server API settings
     host: str = Field(..., description="Wazuh server hostname or IP address")
     port: int = Field(default=55000, ge=1, le=65535, description="Wazuh API port")
     username: str = Field(..., min_length=1, description="Wazuh API username")
     password: str = Field(..., min_length=1, description="Wazuh API password")
     verify_ssl: bool = Field(default=True, description="Enable SSL certificate verification")
     api_version: str = Field(default="v4", description="Wazuh API version")
+    
+    # Wazuh Indexer API settings (for 4.8.0+)
+    indexer_host: Optional[str] = Field(default=None, description="Wazuh Indexer hostname or IP")
+    indexer_port: int = Field(default=9200, ge=1, le=65535, description="Wazuh Indexer port")
+    indexer_username: Optional[str] = Field(default=None, description="Wazuh Indexer username")
+    indexer_password: Optional[str] = Field(default=None, description="Wazuh Indexer password")
+    indexer_verify_ssl: Optional[bool] = Field(default=None, description="Indexer SSL verification")
+    
+    # Wazuh version compatibility
+    wazuh_version: Optional[str] = Field(default=None, description="Wazuh version (auto-detected if None)")
+    use_indexer_for_alerts: bool = Field(default=True, description="Use Indexer API for alerts (4.8.0+)")
+    use_indexer_for_vulnerabilities: bool = Field(default=True, description="Use Indexer API for vulnerabilities (4.8.0+)")
     
     # Optional external API keys
     virustotal_api_key: Optional[str] = Field(default=None, description="VirusTotal API key")
@@ -122,26 +157,57 @@ class WazuhConfig(BaseModel):
     def from_env(cls) -> 'WazuhConfig':
         """Create configuration from environment variables."""
         try:
+            # Indexer settings with fallback to server settings
+            indexer_host = os.getenv("WAZUH_INDEXER_HOST") or os.getenv("WAZUH_HOST")
+            indexer_username = os.getenv("WAZUH_INDEXER_USER") or os.getenv("WAZUH_USER")
+            indexer_password = os.getenv("WAZUH_INDEXER_PASS") or os.getenv("WAZUH_PASS")
+            indexer_verify_ssl = os.getenv("WAZUH_INDEXER_VERIFY_SSL")
+            if indexer_verify_ssl is None:
+                indexer_verify_ssl = os.getenv("VERIFY_SSL", "true").lower() == "true"
+            else:
+                indexer_verify_ssl = indexer_verify_ssl.lower() == "true"
+            
             return cls(
+                # Server API settings
                 host=os.getenv("WAZUH_HOST"),
                 port=int(os.getenv("WAZUH_PORT", "55000")),
                 username=os.getenv("WAZUH_USER"),
                 password=os.getenv("WAZUH_PASS"),
                 verify_ssl=os.getenv("VERIFY_SSL", "true").lower() == "true",
                 api_version=os.getenv("WAZUH_API_VERSION", "v4"),
+                
+                # Indexer API settings
+                indexer_host=indexer_host,
+                indexer_port=int(os.getenv("WAZUH_INDEXER_PORT", "9200")),
+                indexer_username=indexer_username,
+                indexer_password=indexer_password,
+                indexer_verify_ssl=indexer_verify_ssl,
+                
+                # Version and feature flags
+                wazuh_version=os.getenv("WAZUH_VERSION"),
+                use_indexer_for_alerts=os.getenv("USE_INDEXER_FOR_ALERTS", "true").lower() == "true",
+                use_indexer_for_vulnerabilities=os.getenv("USE_INDEXER_FOR_VULNERABILITIES", "true").lower() == "true",
+                
+                # External APIs
                 virustotal_api_key=os.getenv("VIRUSTOTAL_API_KEY"),
                 shodan_api_key=os.getenv("SHODAN_API_KEY"),
                 abuseipdb_api_key=os.getenv("ABUSEIPDB_API_KEY"),
+                
+                # Performance settings
                 max_alerts_per_query=int(os.getenv("MAX_ALERTS_PER_QUERY", "1000")),
                 max_agents_per_scan=int(os.getenv("MAX_AGENTS_PER_SCAN", "10")),
                 cache_ttl_seconds=int(os.getenv("CACHE_TTL_SECONDS", "300")),
                 request_timeout_seconds=int(os.getenv("REQUEST_TIMEOUT_SECONDS", "30")),
                 max_connections=int(os.getenv("MAX_CONNECTIONS", "10")),
                 pool_size=int(os.getenv("POOL_SIZE", "5")),
+                
+                # Feature flags
                 enable_external_intel=os.getenv("ENABLE_EXTERNAL_INTEL", "true").lower() == "true",
                 enable_ml_analysis=os.getenv("ENABLE_ML_ANALYSIS", "true").lower() == "true",
                 enable_compliance_checking=os.getenv("ENABLE_COMPLIANCE_CHECKING", "true").lower() == "true",
                 enable_experimental=os.getenv("ENABLE_EXPERIMENTAL", "false").lower() == "true",
+                
+                # Logging
                 debug=os.getenv("DEBUG", "false").lower() == "true",
                 log_level=os.getenv("LOG_LEVEL", "INFO"),
             )
