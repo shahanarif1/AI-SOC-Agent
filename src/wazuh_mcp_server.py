@@ -323,32 +323,45 @@ class WazuhMCPServer:
         async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             """Execute Wazuh tools with comprehensive validation and error handling."""
             request_id = str(uuid.uuid4())
+            start_time = datetime.utcnow()
             
             try:
                 with LogContext(request_id):
                     self.logger.info(f"Executing tool: {name}", extra={"details": arguments})
                     
+                    # Apply timeout to all tool executions
+                    timeout = self.config.request_timeout_seconds * 2  # Double timeout for complex operations
+                    
                     if name == "get_alerts":
-                        return await self._handle_get_alerts(arguments)
-                    
+                        result = await asyncio.wait_for(self._handle_get_alerts(arguments), timeout=timeout)
                     elif name == "analyze_threats":
-                        return await self._handle_analyze_threats(arguments)
-                    
+                        result = await asyncio.wait_for(self._handle_analyze_threats(arguments), timeout=timeout)
                     elif name == "check_agent_health":
-                        return await self._handle_check_agent_health(arguments)
-                    
+                        result = await asyncio.wait_for(self._handle_check_agent_health(arguments), timeout=timeout)
                     elif name == "compliance_check":
-                        return await self._handle_compliance_check(arguments)
-                    
+                        result = await asyncio.wait_for(self._handle_compliance_check(arguments), timeout=timeout)
                     elif name == "check_ioc":
-                        return await self._handle_check_ioc(arguments)
-                    
+                        result = await asyncio.wait_for(self._handle_check_ioc(arguments), timeout=timeout)
                     elif name == "risk_assessment":
-                        return await self._handle_risk_assessment(arguments)
-                    
+                        result = await asyncio.wait_for(self._handle_risk_assessment(arguments), timeout=timeout)
                     else:
                         raise ValueError(f"Unknown tool: {name}")
+                    
+                    execution_time = (datetime.utcnow() - start_time).total_seconds()
+                    self.logger.info(f"Tool {name} completed in {execution_time:.2f}s")
+                    return result
                         
+            except asyncio.TimeoutError:
+                execution_time = (datetime.utcnow() - start_time).total_seconds()
+                self.logger.error(f"Tool {name} timed out after {execution_time:.2f}s")
+                return [types.TextContent(
+                    type="text",
+                    text=json.dumps({
+                        "error": f"Tool execution timed out after {execution_time:.2f} seconds",
+                        "request_id": request_id,
+                        "timeout": timeout
+                    })
+                )]
             except ValidationError as e:
                 self.logger.warning(f"Validation error in tool {name}: {str(e)}")
                 return [types.TextContent(
@@ -356,10 +369,15 @@ class WazuhMCPServer:
                     text=json.dumps({"error": f"Validation error: {str(e)}", "request_id": request_id})
                 )]
             except Exception as e:
-                self.logger.error(f"Error executing tool {name}: {str(e)}")
+                execution_time = (datetime.utcnow() - start_time).total_seconds()
+                self.logger.error(f"Error executing tool {name} after {execution_time:.2f}s: {str(e)}")
                 return [types.TextContent(
                     type="text",
-                    text=json.dumps({"error": str(e), "request_id": request_id})
+                    text=json.dumps({
+                        "error": str(e), 
+                        "request_id": request_id,
+                        "execution_time": execution_time
+                    })
                 )]
     
     async def _handle_get_alerts(self, arguments: dict) -> list[types.TextContent]:
@@ -899,12 +917,21 @@ class WazuhMCPServer:
             self.logger.info(f"Wazuh MCP Server v{__version__} starting...")
             self.logger.info(f"Connecting to Wazuh at {self.config.base_url}")
             
-            # Test connection
-            health_data = await self.api_client.health_check()
-            if health_data.get("status") != "healthy":
-                raise ConnectionError(f"Wazuh API health check failed: {health_data}")
-            
-            self.logger.info("Wazuh API connection verified successfully")
+            # Test connection with timeout and better error handling
+            try:
+                health_data = await asyncio.wait_for(
+                    self.api_client.health_check(), 
+                    timeout=self.config.request_timeout_seconds
+                )
+                if health_data.get("status") != "healthy":
+                    self.logger.warning(f"Wazuh API health check returned: {health_data}")
+                    # Continue anyway - some Wazuh versions may not have health endpoint
+                else:
+                    self.logger.info("Wazuh API connection verified successfully")
+            except asyncio.TimeoutError:
+                self.logger.warning("Wazuh API health check timed out, continuing anyway")
+            except Exception as e:
+                self.logger.warning(f"Wazuh API health check failed: {str(e)}, continuing anyway")
             
             init_options = InitializationOptions(
                 server_name="wazuh-mcp",
@@ -915,7 +942,9 @@ class WazuhMCPServer:
                 )
             )
             
+            # Use stdio transport for DXT compatibility
             async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+                self.logger.info("MCP server started successfully on stdio transport")
                 await self.server.run(
                     read_stream,
                     write_stream,
@@ -927,7 +956,10 @@ class WazuhMCPServer:
             raise
         finally:
             self.logger.info("Shutting down Wazuh MCP Server...")
-            await self.api_client.__aexit__(None, None, None)
+            try:
+                await self.api_client.__aexit__(None, None, None)
+            except Exception as e:
+                self.logger.error(f"Error during cleanup: {str(e)}")
             self.logger.info("Server shutdown completed")
 
 

@@ -20,9 +20,13 @@ setup(
         "python-dateutil>=2.8.2",
         "python-dotenv>=1.0.0",
         "pydantic>=2.0.0",
-        "pytest>=7.0.0",
-        "pytest-asyncio>=0.21.0",
     ],
+    extras_require={
+        "dev": [
+            "pytest>=7.0.0",
+            "pytest-asyncio>=0.21.0",
+        ]
+    },
     entry_points={
         "console_scripts": [
             "wazuh-mcp-server=src.wazuh_mcp_server:main",

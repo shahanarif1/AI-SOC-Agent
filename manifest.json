@@ -1,0 +1,185 @@
+{
+  "dxt_version": "0.1",
+  "name": "wazuh-mcp-server",
+  "version": "2.0.0",
+  "display_name": "Wazuh MCP Server",
+  "description": "AI-powered security operations with Wazuh SIEM integration",
+  "long_description": "Transform your security operations with AI-powered threat detection, automated incident response, and natural language security analysis. This Desktop Extension provides seamless integration between Wazuh SIEM and Claude Desktop, enabling security teams to interact with their security infrastructure using natural language queries.",
+  "author": {
+    "name": "Security Team",
+    "email": "security@gensecai.com",
+    "url": "https://github.com/gensecaihq/Wazuh-MCP-Server"
+  },
+  "icon": "icon.png",
+  "server": {
+    "type": "python",
+    "entry_point": "src/wazuh_mcp_server.py",
+    "mcp_config": {
+      "command": "python",
+      "args": ["-m", "src.wazuh_mcp_server"],
+      "env": {
+        "PYTHONPATH": ".",
+        "WAZUH_HOST": "${WAZUH_HOST}",
+        "WAZUH_PORT": "${WAZUH_PORT}",
+        "WAZUH_USER": "${WAZUH_USER}",
+        "WAZUH_PASS": "${WAZUH_PASS}",
+        "VERIFY_SSL": "${VERIFY_SSL}",
+        "WAZUH_INDEXER_HOST": "${WAZUH_INDEXER_HOST}",
+        "WAZUH_INDEXER_PORT": "${WAZUH_INDEXER_PORT}",
+        "WAZUH_INDEXER_USER": "${WAZUH_INDEXER_USER}",
+        "WAZUH_INDEXER_PASS": "${WAZUH_INDEXER_PASS}",
+        "LOG_LEVEL": "${LOG_LEVEL}"
+      }
+    }
+  },
+  "user_config": [
+    {
+      "key": "WAZUH_HOST",
+      "title": "Wazuh Server Host",
+      "description": "Hostname or IP address of your Wazuh server",
+      "type": "string",
+      "required": true,
+      "default": "localhost"
+    },
+    {
+      "key": "WAZUH_PORT",
+      "title": "Wazuh API Port",
+      "description": "Port number for Wazuh API (default: 55000)",
+      "type": "number",
+      "required": false,
+      "default": 55000
+    },
+    {
+      "key": "WAZUH_USER",
+      "title": "Wazuh Username",
+      "description": "Username for Wazuh API authentication",
+      "type": "string",
+      "required": true
+    },
+    {
+      "key": "WAZUH_PASS",
+      "title": "Wazuh Password",
+      "description": "Password for Wazuh API authentication",
+      "type": "string",
+      "required": true,
+      "sensitive": true
+    },
+    {
+      "key": "VERIFY_SSL",
+      "title": "Verify SSL Certificate",
+      "description": "Enable SSL certificate verification for secure connections",
+      "type": "boolean",
+      "required": false,
+      "default": true
+    },
+    {
+      "key": "WAZUH_INDEXER_HOST",
+      "title": "Wazuh Indexer Host",
+      "description": "Hostname or IP address of Wazuh Indexer (for Wazuh 4.8+)",
+      "type": "string",
+      "required": false
+    },
+    {
+      "key": "WAZUH_INDEXER_PORT",
+      "title": "Wazuh Indexer Port",
+      "description": "Port number for Wazuh Indexer (default: 9200)",
+      "type": "number",
+      "required": false,
+      "default": 9200
+    },
+    {
+      "key": "WAZUH_INDEXER_USER",
+      "title": "Wazuh Indexer Username",
+      "description": "Username for Wazuh Indexer authentication",
+      "type": "string",
+      "required": false
+    },
+    {
+      "key": "WAZUH_INDEXER_PASS",
+      "title": "Wazuh Indexer Password",
+      "description": "Password for Wazuh Indexer authentication",
+      "type": "string",
+      "required": false,
+      "sensitive": true
+    },
+    {
+      "key": "LOG_LEVEL",
+      "title": "Logging Level",
+      "description": "Set the logging verbosity level",
+      "type": "string",
+      "required": false,
+      "default": "INFO",
+      "options": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_alerts",
+      "description": "Retrieve Wazuh alerts with advanced filtering and validation"
+    },
+    {
+      "name": "analyze_threats",
+      "description": "Perform comprehensive threat analysis with ML-based risk assessment"
+    },
+    {
+      "name": "check_agent_health",
+      "description": "Comprehensive agent health monitoring and diagnostics"
+    },
+    {
+      "name": "compliance_check",
+      "description": "Perform compliance assessment against security frameworks (PCI DSS, HIPAA, GDPR, NIST, ISO27001)"
+    },
+    {
+      "name": "check_ioc",
+      "description": "Check indicators of compromise against threat intelligence"
+    },
+    {
+      "name": "risk_assessment",
+      "description": "Comprehensive security risk assessment with recommendations"
+    }
+  ],
+  "resources": [
+    {
+      "uri": "wazuh://alerts/recent",
+      "name": "Recent Alerts",
+      "description": "Most recent security alerts from Wazuh"
+    },
+    {
+      "uri": "wazuh://agents/status",
+      "name": "Agent Status",
+      "description": "Status of all Wazuh agents"
+    },
+    {
+      "uri": "wazuh://vulnerabilities/critical",
+      "name": "Critical Vulnerabilities",
+      "description": "Critical vulnerabilities across all agents"
+    },
+    {
+      "uri": "wazuh://compliance/status",
+      "name": "Compliance Status",
+      "description": "Current compliance posture"
+    },
+    {
+      "uri": "wazuh://threats/active",
+      "name": "Active Threats",
+      "description": "Currently active threat indicators"
+    },
+    {
+      "uri": "wazuh://system/health",
+      "name": "System Health",
+      "description": "Overall system health metrics"
+    }
+  ],
+  "compatibility": {
+    "claude_desktop": ">=0.3.0",
+    "python": ">=3.8",
+    "platforms": ["darwin", "linux", "win32"]
+  },
+  "keywords": ["security", "siem", "wazuh", "threat-detection", "compliance", "cybersecurity"],
+  "license": "MIT",
+  "homepage": "https://github.com/gensecaihq/Wazuh-MCP-Server",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gensecaihq/Wazuh-MCP-Server.git"
+  }
+}

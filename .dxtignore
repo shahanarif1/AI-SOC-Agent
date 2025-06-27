@@ -1,0 +1,60 @@
+# DXT package ignore file
+# Similar to .gitignore but for DXT packaging
+
+# Development files
+.git/
+.github/
+.gitignore
+.env*
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+.tox/
+venv/
+env/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (exclude from package to reduce size)
+docs/
+*.md
+!DXT_README.md
+!README.md
+
+# Test files
+tests/
+test_*.py
+
+# Build files
+build/
+dist/
+*.egg-info/
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker files (not needed in DXT)
+Dockerfile
+docker-compose.yml
+
+# Scripts (keep only essential ones)
+scripts/
+
+# Workspace files
+*.code-workspace

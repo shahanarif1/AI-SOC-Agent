@@ -2,8 +2,10 @@
 
 import re
 import ipaddress
+import hashlib
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, validator
+from ..security.security_manager import security_manager, SecurityContext, SecurityLevel
 
 
 class ValidationError(Exception):
@@ -131,9 +133,13 @@ class FileHash(BaseModel):
 
 
 def validate_alert_query(params: Dict[str, Any]) -> AlertQuery:
-    """Validate and sanitize alert query parameters."""
+    """Validate and sanitize alert query parameters with security checks."""
     try:
-        return AlertQuery(**params)
+        # Apply security validation
+        context = SecurityContext(security_level=SecurityLevel.MEDIUM)
+        validated_params = security_manager.validate_wazuh_query_params(params)
+        
+        return AlertQuery(**validated_params)
     except Exception as e:
         raise ValidationError(f"Invalid alert query parameters: {str(e)}")
 

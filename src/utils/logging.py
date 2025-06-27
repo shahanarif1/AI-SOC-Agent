@@ -1,4 +1,4 @@
-"""Structured logging configuration with rotation and security features."""
+"""Enhanced logging configuration with production-grade monitoring and security features."""
 
 import os
 import sys
@@ -6,9 +6,17 @@ import json
 import asyncio
 import logging
 import logging.handlers
+import threading
+import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
+from contextvars import ContextVar
+
+# Context variables for request tracking
+request_id_var: ContextVar[str] = ContextVar('request_id', default='')
+user_id_var: ContextVar[str] = ContextVar('user_id', default='')
+session_id_var: ContextVar[str] = ContextVar('session_id', default='')
 
 
 class SecurityAuditFilter(logging.Filter):
