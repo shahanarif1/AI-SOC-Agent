@@ -70,7 +70,13 @@ class WazuhConfig(BaseModel):
     port: int = Field(default=55000, ge=1, le=65535, description="Wazuh API port")
     username: str = Field(..., min_length=1, description="Wazuh API username")
     password: str = Field(..., min_length=1, description="Wazuh API password")
-    verify_ssl: bool = Field(default=True, description="Enable SSL certificate verification")
+    verify_ssl: bool = Field(default=False, description="Enable SSL certificate verification (disabled by default for ease of use)")
+    ca_bundle_path: Optional[str] = Field(default=None, description="Custom CA bundle path")
+    client_cert_path: Optional[str] = Field(default=None, description="Client certificate path")
+    client_key_path: Optional[str] = Field(default=None, description="Client private key path")
+    allow_self_signed: bool = Field(default=True, description="Allow self-signed certificates (enabled by default)")
+    ssl_timeout: int = Field(default=30, ge=1, le=300, description="SSL connection timeout")
+    auto_detect_ssl_issues: bool = Field(default=True, description="Automatically handle SSL certificate issues")
     api_version: str = Field(default="v4", description="Wazuh API version")
     
     # Wazuh Indexer API settings (for 4.8.0+)
@@ -79,6 +85,11 @@ class WazuhConfig(BaseModel):
     indexer_username: Optional[str] = Field(default=None, description="Wazuh Indexer username")
     indexer_password: Optional[str] = Field(default=None, description="Wazuh Indexer password")
     indexer_verify_ssl: Optional[bool] = Field(default=None, description="Indexer SSL verification")
+    indexer_ca_bundle_path: Optional[str] = Field(default=None, description="Indexer custom CA bundle path")
+    indexer_client_cert_path: Optional[str] = Field(default=None, description="Indexer client certificate path")
+    indexer_client_key_path: Optional[str] = Field(default=None, description="Indexer client private key path")
+    indexer_allow_self_signed: bool = Field(default=True, description="Allow self-signed certificates for Indexer (enabled by default)")
+    indexer_auto_detect_ssl_issues: bool = Field(default=True, description="Automatically handle Indexer SSL certificate issues")
     
     # Wazuh version compatibility
     wazuh_version: Optional[str] = Field(default=None, description="Wazuh version (auto-detected if None)")
