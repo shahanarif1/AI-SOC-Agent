@@ -101,6 +101,85 @@ Ask Claude questions like:
 
 ## 🚀 Quick Start
 
+### ⚡ Production Installation (Recommended)
+
+```bash
+# 1. Clone and enter directory
+git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
+cd Wazuh-MCP-Server
+
+# 2. Install the package (this fixes all import issues)
+pip install -e .
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env with your Wazuh credentials
+
+# 4. 🔒 Smart SSL Setup (OPTIONAL - works with ANY certificate type)
+python scripts/run.py ssl-setup    # Auto-configures SSL for your environment
+
+# 5. Test connection
+wazuh-mcp-test
+
+# 6. Start the server
+wazuh-mcp-server
+```
+
+### 🚀 Zero-Configuration SSL Support
+
+**The MCP server works out-of-the-box with ANY certificate type:**
+- ✅ **Self-signed certificates** (development, testing)
+- ✅ **Internal CA certificates** (corporate environments)  
+- ✅ **Commercial certificates** (Let's Encrypt, DigiCert, etc.)
+- ✅ **No certificate configuration required**
+
+**Default behavior**: SSL verification is **disabled** for maximum compatibility. Enable only if you have commercial certificates and need strict security.
+
+### 🔧 Alternative Installation Methods
+
+#### Cross-Platform Launcher (Windows/Linux/macOS)
+```bash
+python scripts/run.py install     # One-time setup
+python scripts/run.py ssl-setup   # Smart SSL configuration (optional)
+python scripts/run.py test        # Test connection
+python scripts/run.py server      # Start server
+```
+
+#### Development Setup
+```bash
+make dev-setup                   # Complete development environment
+make setup-ssl                   # Smart SSL configuration (optional)
+make run-test                    # Test connection
+make run-server                  # Start server
+```
+
+#### Module Execution
+```bash
+python -m src.wazuh_mcp_server      # Start server
+python -m scripts.test_connection   # Test connection
+```
+
+### 🆘 Troubleshooting
+
+**Import Errors:**
+```bash
+make validate-env                # Check environment
+make fix-imports                 # Fix import issues
+```
+
+**SSL/Certificate Issues:**
+```bash
+make setup-ssl                   # Auto-configure SSL for your environment
+make check-ssl                   # Check SSL connectivity
+make fix-ssl                     # Fix common SSL issues
+```
+
+**Comprehensive Guides:**
+- [PRODUCTION_FIXES_GUIDE.md](PRODUCTION_FIXES_GUIDE.md) - Complete troubleshooting
+- [SSL_TROUBLESHOOTING_GUIDE.md](SSL_TROUBLESHOOTING_GUIDE.md) - SSL-specific issues
+
+## 🚀 Original Quick Start
+
 ### Prerequisites
 
 - Python 3.8+ 

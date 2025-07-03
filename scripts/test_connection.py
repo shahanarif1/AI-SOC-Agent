@@ -18,7 +18,18 @@ else:
     load_dotenv()
     print("Warning: No .env file found at project root, trying current directory")
 
-sys.path.insert(0, str(project_root / "src"))
+# Setup import path and error handling
+src_path = str(project_root / "src")
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+# Setup enhanced error handling for imports
+try:
+    from utils.import_helper import setup_import_error_handler
+    setup_import_error_handler()
+except ImportError:
+    # Fallback if import_helper is not available
+    pass
 
 from config import WazuhConfig
 from api.wazuh_client_manager import WazuhClientManager
@@ -84,5 +95,10 @@ async def test_connection():
         sys.exit(1)
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for console script."""
     asyncio.run(test_connection())
+
+
+if __name__ == "__main__":
+    main()

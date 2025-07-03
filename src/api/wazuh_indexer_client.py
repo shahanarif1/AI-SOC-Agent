@@ -71,27 +71,28 @@ class WazuhIndexerClient:
         })
     
     def _validate_ssl_config(self):
-        """Validate SSL/TLS configuration for production."""
+        """Validate SSL/TLS configuration with user-friendly messaging."""
         if not self.verify_ssl:
-            logger.warning("SSL verification disabled for Indexer API - not recommended for production", extra={
+            logger.info("SSL verification disabled for maximum compatibility with all certificate types", extra={
                 "details": {
                     "host": self.host,
                     "port": self.port,
-                    "security_risk": "high"
+                    "compatibility": "high",
+                    "note": "This allows connection to self-signed, internal CA, and commercial certificates"
                 }
             })
         
-        # Check for localhost/internal networks with SSL disabled
+        # Check for localhost/internal networks - more permissive messaging
         if not self.verify_ssl and not (
             self.host in ['localhost', '127.0.0.1'] or 
             self.host.startswith('192.168.') or
             self.host.startswith('10.') or
             self.host.startswith('172.')
         ):
-            logger.error("SSL verification disabled for external host - critical security risk", extra={
+            logger.info("SSL verification disabled for external host - ensure this is intended", extra={
                 "details": {
                     "host": self.host,
-                    "recommendation": "Enable SSL verification for external hosts"
+                    "note": "For production with commercial certificates, consider setting VERIFY_SSL=true"
                 }
             })
     
@@ -107,15 +108,26 @@ class WazuhIndexerClient:
             logger.debug("Wazuh Indexer client session closed")
     
     async def _create_session(self):
-        """Create aiohttp session with proper configuration."""
+        """Create aiohttp session with proper SSL configuration."""
+        from ..utils.ssl_helper import SSLConfig
+        
         timeout = aiohttp.ClientTimeout(total=self.config.request_timeout_seconds)
-        connector = aiohttp.TCPConnector(
-            ssl=self.verify_ssl,
-            limit=self.config.max_connections,
-            limit_per_host=self.config.pool_size,
-            keepalive_timeout=60,
-            enable_cleanup_closed=True
+        
+        # Create SSL configuration with user-friendly defaults
+        ssl_config = SSLConfig(
+            verify_ssl=self.verify_ssl,
+            ca_bundle_path=getattr(self.config, 'indexer_ca_bundle_path', None),
+            client_cert_path=getattr(self.config, 'indexer_client_cert_path', None),
+            client_key_path=getattr(self.config, 'indexer_client_key_path', None),
+            allow_self_signed=getattr(self.config, 'indexer_allow_self_signed', True),  # Default to True
+            ssl_timeout=getattr(self.config, 'ssl_timeout', 30),
+            auto_detect_ssl_issues=getattr(self.config, 'indexer_auto_detect_ssl_issues', True)
         )
+        
+        # Create connector with SSL configuration
+        connector = ssl_config.create_aiohttp_connector()
+        connector.limit = self.config.max_connections
+        connector.limit_per_host = self.config.pool_size
         
         self.session = aiohttp.ClientSession(
             connector=connector,
@@ -124,7 +136,7 @@ class WazuhIndexerClient:
             auth=aiohttp.BasicAuth(self.username, self.password)
         )
         
-        logger.debug("Created Wazuh Indexer session with optimized settings")
+        logger.debug("Created Wazuh Indexer session with enhanced SSL configuration")
     
     async def _request(
         self, 
@@ -307,8 +319,9 @@ class WazuhIndexerClient:
         # If no filters, use match_all with basic performance optimization
         if not query["query"]["bool"]["must"] and not query["query"]["bool"]["filter"]:
             query["query"] = {
-                "match_all": {},
-                "boost": 1.0
+                "match_all": {
+                    "boost": 1.0
+                }
             }
         
         # Add aggregations for monitoring and debugging
