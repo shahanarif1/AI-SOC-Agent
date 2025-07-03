@@ -247,6 +247,11 @@ Pick any item from the roadmap (or propose your own!) and start contributing. We
 
 We welcome contributions from the security community! Whether you're a security researcher, developer, or SOC analyst, there's a place for you here.
 
+
+## Special Thanks ##
+
+[@marcolinux46](https://github.com/marcolinux46) for their outstanding contributions to this project. Your deep involvement—from thorough testing and detailed log sharing to research and real-time feedback—enabled the rapid identification and resolution of several critical bugs.
+
 ### 🎯 How You Can Help
 
 - **🔍 Security Researchers**: Contribute new threat detection algorithms or analysis techniques
@@ -295,6 +300,8 @@ pytest
 ```
 
 **First time contributing to open source?** No problem! We'll help you through the process. Just open an issue saying you'd like to help, and we'll find something perfect for your skill level.
+
+Your dedication, technical insight, and willingness to dive deep into the issues have significantly improved the stability and reliability of the project. We truly appreciate your time, collaboration, and continued support. Thank you!
 
 ## 📚 Documentation
 
