@@ -316,12 +316,10 @@ class WazuhIndexerClient:
                 "term": {f"{agent_id_field}.keyword": clean_agent_id}  # Use keyword field for exact match
             })
         
-        # If no filters, use match_all with basic performance optimization
+        # If no filters, use match_all
         if not query["query"]["bool"]["must"] and not query["query"]["bool"]["filter"]:
             query["query"] = {
-                "match_all": {
-                    "boost": 1.0
-                }
+                "match_all": {}
             }
         
         # Add aggregations for monitoring and debugging
