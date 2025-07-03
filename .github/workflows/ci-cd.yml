@@ -1,4 +1,4 @@
-name: CI/CD Pipeline for Wazuh MCP DXT
+name: CI/CD Pipeline for Wazuh MCP Server
 
 on:
   push:
@@ -198,7 +198,7 @@ jobs:
           WAZUH_PASS: wazuh
           VERIFY_SSL: false
         run: |
-          pytest tests/test_dxt_integration.py -v -k integration
+          pytest tests/ -v -k integration
 
   # ================================================================
   # PERFORMANCE TESTING
@@ -238,11 +238,11 @@ jobs:
             memory-profile.txt
 
   # ================================================================
-  # DXT VALIDATION
+  # MANIFEST VALIDATION
   # ================================================================
   
-  validate-dxt:
-    name: 📦 DXT Manifest Validation
+  validate-manifest:
+    name: 📦 Manifest Validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -263,17 +263,12 @@ jobs:
           with open('manifest.json') as f:
               manifest = json.load(f)
           
-          required_fields = ['dxt_version', 'name', 'version', 'description', 'author', 'server']
+          required_fields = ['name', 'version', 'description', 'author', 'server']
           for field in required_fields:
               assert field in manifest, f'Missing required field: {field}'
           
           print('✅ Manifest validation passed')
           "
-      
-      - name: Test DXT packaging
-        run: |
-          # Create test DXT package
-          python scripts/package_dxt.py --test-mode
       
       - name: Validate Python entry point
         run: |
@@ -289,8 +284,8 @@ jobs:
   # ================================================================
   
   build:
-    name: 🏗️ Build DXT Package
-    needs: [lint-and-format, security-scan, test, validate-dxt]
+    name: 🏗️ Build Package
+    needs: [lint-and-format, security-scan, test, validate-manifest]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' || github.event_name == 'release'
     
@@ -314,17 +309,12 @@ jobs:
         run: |
           python -m build
       
-      - name: Create DXT package
-        run: |
-          python scripts/package_dxt.py
-      
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: dxt-package
+          name: build-package
           path: |
             dist/
-            *.dxt
 
   # ================================================================
   # DEPLOYMENT
@@ -342,7 +332,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v3
         with:
-          name: dxt-package
+          name: build-package
       
       - name: Create Release
         uses: actions/create-release@v1
@@ -352,40 +342,39 @@ jobs:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
           body: |
-            ## 🛡️ Wazuh MCP Server DXT ${{ github.ref }}
+            ## 🛡️ Wazuh MCP Server ${{ github.ref }}
             
             ### 🆕 What's New
-            - Production-ready Desktop Extension for Claude Desktop
+            - Production-ready MCP server for Wazuh integration
             - Enhanced security monitoring and threat analysis
             - Comprehensive compliance framework support
             
             ### 📦 Installation
-            1. Download the `.dxt` file from the assets below
-            2. Open Claude Desktop → Extensions → Install Extension
-            3. Select the downloaded `.dxt` file
-            4. Configure your Wazuh credentials in extension settings
+            1. Download the source package from the assets below
+            2. Install with pip: `pip install wazuh-mcp-server`
+            3. Configure your Wazuh credentials in environment variables
+            4. Run the server: `wazuh-mcp-server`
             
             ### 🔧 Requirements
-            - Claude Desktop v0.3.0+
             - Python 3.8+
             - Wazuh 4.x deployment
             
             ### 📚 Documentation
-            - [Setup Guide](docs/dxt-setup.md)
+            - [Setup Guide](docs/setup.md)
             - [Usage Examples](docs/usage.md)
             - [Configuration Reference](docs/configuration.md)
           draft: false
           prerelease: false
       
-      - name: Upload DXT to Release
+      - name: Upload Package to Release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./wazuh-mcp-server.dxt
-          asset_name: wazuh-mcp-server-${{ github.ref_name }}.dxt
-          asset_content_type: application/zip
+          asset_path: ./dist/
+          asset_name: wazuh-mcp-server-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/gzip
 
   # ================================================================
   # NOTIFICATIONS
@@ -401,11 +390,11 @@ jobs:
       - name: Notify success
         if: needs.deploy.result == 'success'
         run: |
-          echo "✅ DXT deployment successful!"
+          echo "✅ Package deployment successful!"
           # Add Slack/Discord/email notifications here
       
       - name: Notify failure
         if: needs.deploy.result == 'failure'
         run: |
-          echo "❌ DXT deployment failed!"
+          echo "❌ Package deployment failed!"
           # Add failure notifications here

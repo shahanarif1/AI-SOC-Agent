@@ -1,7 +1,9 @@
 """Advanced security analysis algorithms for threat detection and risk assessment."""
 
+import re
 import statistics
 import math
+from functools import lru_cache
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from collections import Counter, defaultdict
@@ -47,8 +49,33 @@ class SecurityAnalyzer:
     def __init__(self):
         self.logger = get_logger(__name__)
         
-        # MITRE ATT&CK technique mappings
-        self.mitre_techniques = {
+        # Pre-compiled regex patterns for performance
+        self.attack_patterns = {
+            'brute_force': re.compile(r'(brute|force|failed|login|authentication)', re.IGNORECASE),
+            'malware': re.compile(r'(malware|virus|trojan|backdoor|rootkit)', re.IGNORECASE),
+            'injection': re.compile(r'(injection|sql|xss|script|command)', re.IGNORECASE),
+            'privilege_escalation': re.compile(r'(privilege|escalation|sudo|admin)', re.IGNORECASE),
+            'lateral_movement': re.compile(r'(lateral|movement|remote|ssh|rdp)', re.IGNORECASE),
+            'data_exfiltration': re.compile(r'(exfiltration|data|transfer|download)', re.IGNORECASE)
+        }
+        
+        # Cache for parsed timestamps to avoid repeated parsing
+        self._timestamp_cache = {}
+        
+        # MITRE ATT&CK technique mappings (cached as class variable)
+        self.mitre_techniques = self._get_mitre_techniques()
+        
+        # Alert severity weights
+        self.severity_weights = {
+            1: 0.1, 2: 0.2, 3: 0.3, 4: 0.4, 5: 0.5,
+            6: 0.6, 7: 0.7, 8: 0.8, 9: 0.9, 10: 1.0,
+            11: 1.2, 12: 1.4, 13: 1.6, 14: 1.8, 15: 2.0
+        }
+    
+    @lru_cache(maxsize=1)
+    def _get_mitre_techniques(self) -> Dict[str, Dict[str, Any]]:
+        """Get MITRE ATT&CK technique mappings (cached for performance)."""
+        return {
             "T1078": {"name": "Valid Accounts", "tactic": "Initial Access", "weight": 0.8},
             "T1190": {"name": "Exploit Public-Facing Application", "tactic": "Initial Access", "weight": 0.9},
             "T1566": {"name": "Phishing", "tactic": "Initial Access", "weight": 0.7},
@@ -59,13 +86,18 @@ class SecurityAnalyzer:
             "T1021": {"name": "Remote Services", "tactic": "Lateral Movement", "weight": 0.7},
             "T1041": {"name": "Exfiltration Over C2 Channel", "tactic": "Exfiltration", "weight": 0.8},
         }
+    
+    def _parse_timestamp_cached(self, timestamp_str: str) -> Optional[datetime]:
+        """Parse timestamp with caching for performance."""
+        if timestamp_str in self._timestamp_cache:
+            return self._timestamp_cache[timestamp_str]
         
-        # Alert severity weights
-        self.severity_weights = {
-            1: 0.1, 2: 0.2, 3: 0.3, 4: 0.4, 5: 0.5,
-            6: 0.6, 7: 0.7, 8: 0.8, 9: 0.9, 10: 1.0,
-            11: 1.2, 12: 1.4, 13: 1.6, 14: 1.8, 15: 2.0
-        }
+        try:
+            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            self._timestamp_cache[timestamp_str] = timestamp
+            return timestamp
+        except (ValueError, TypeError, AttributeError):
+            return None
     
     def calculate_comprehensive_risk_score(
         self, 
@@ -282,7 +314,8 @@ class SecurityAnalyzer:
                 timestamp_str = alert.get("timestamp", "")
                 timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
                 hour_counter[timestamp.hour] += 1
-            except:
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.debug(f"Failed to parse timestamp '{timestamp_str}': {e}")
                 continue
         
         # Check for unusual time patterns (e.g., many alerts during off-hours)
@@ -460,7 +493,8 @@ class SecurityAnalyzer:
                 timestamp_str = alert.get("timestamp", "")
                 timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
                 timestamps.append(timestamp)
-            except:
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.debug(f"Failed to parse timestamp: {e}")
                 continue
         
         if len(timestamps) < 3:

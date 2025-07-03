@@ -22,8 +22,8 @@ PACKAGE_NAME := wazuh-mcp-server
 VERSION := $(shell $(PYTHON) -c "from src.__version__ import __version__; print(__version__)" 2>$(NULLDEV) || echo "unknown")
 
 help: ## Show this help message
-	@echo "🛡️  Wazuh MCP Server DXT - Production Build System"
-	@echo "=================================================="
+	@echo "🛡️  Wazuh MCP Server - Production Build System"
+	@echo "=============================================="
 	@echo "Available commands:"
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
@@ -65,7 +65,7 @@ test: ## Run test suite
 
 test-integration: ## Run integration tests
 	@echo "🔗 Running integration tests..."
-	$(PYTHON) -m pytest tests/test_dxt_integration.py -v
+	$(PYTHON) -m pytest tests/ -k integration -v
 
 lint: ## Run code linting
 	@echo "🔍 Running code linting..."
@@ -97,19 +97,14 @@ build: clean lint security ## Build the package
 	@echo "🏗️ Building package..."
 	$(PYTHON) -m build
 
-validate-manifest: ## Validate DXT manifest
-	@echo "📋 Validating DXT manifest..."
+validate-manifest: ## Validate manifest
+	@echo "📋 Validating manifest..."
 	$(PYTHON) -c "import json; json.load(open('manifest.json')); print('✅ Manifest is valid JSON')"
-	$(PYTHON) scripts/package_dxt.py --validate-only
 
-package: build validate-manifest ## Create DXT package
-	@echo "📦 Creating DXT package..."
-	$(PYTHON) scripts/package_dxt.py
-	@echo "✅ DXT package created: $(PACKAGE_NAME)-$(VERSION).dxt"
-
-package-test: ## Create test DXT package
-	@echo "🧪 Creating test DXT package..."
-	$(PYTHON) scripts/package_dxt.py --test-mode
+package: build validate-manifest ## Create package
+	@echo "📦 Creating package..."
+	$(PYTHON) -m build
+	@echo "✅ Package created"
 
 health-check: ## Run health checks
 	@echo "🩺 Running health checks..."
@@ -140,13 +135,11 @@ ci: clean format-check lint security test ## Run full CI pipeline
 
 release: ci build package ## Build release
 	@echo "🎉 Building release $(VERSION)..."
-	@echo "📦 Package: $(PACKAGE_NAME)-$(VERSION).dxt"
 	@echo "✅ Release ready for deployment!"
 
 deploy-check: ## Check deployment readiness
 	@echo "🔍 Checking deployment readiness..."
 	@echo "Version: $(VERSION)"
-	@test -f "$(PACKAGE_NAME)-$(VERSION).dxt" || (echo "❌ DXT package not found" && exit 1)
 	@echo "✅ Deployment ready!"
 
 status: ## Show project status
@@ -154,7 +147,6 @@ status: ## Show project status
 	@echo "================"
 	@echo "Version: $(VERSION)"
 	@echo "Python: $(shell $(PYTHON) --version)"
-	@echo "Package exists: $(shell test -f '$(PACKAGE_NAME)-$(VERSION).dxt' && echo '✅ Yes' || echo '❌ No')"
 	@echo "Dependencies: $(shell $(PIP) check > /dev/null 2>&1 && echo '✅ OK' || echo '❌ Issues found')"
 
 # Development shortcuts

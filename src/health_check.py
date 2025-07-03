@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Production-grade health checks and self-diagnostics for DXT extension.
+Production-grade health checks and self-diagnostics for MCP server.
 """
 
 import asyncio

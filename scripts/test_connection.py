@@ -1,38 +1,64 @@
 #!/usr/bin/env python3
+"""
+Production-grade Wazuh MCP Server connection test script.
+Handles cross-platform execution and robust import path resolution.
+"""
+
 import asyncio
 import sys
+import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Find .env file - works on both Windows and Linux
+# Setup import paths first
 script_dir = Path(__file__).resolve().parent
 project_root = script_dir.parent
-env_file = project_root / '.env'
+src_path = str(project_root / "src")
 
-# Load environment variables from .env file if it exists
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# Import the resolver and setup imports
+try:
+    from utils.import_resolver import setup_imports, safe_import
+    resolver = setup_imports(verify=True)
+    print("✅ Import paths configured successfully")
+except ImportError as e:
+    print(f"❌ Failed to setup imports: {e}")
+    print(f"Trying basic import setup...")
+    # Fallback to basic setup
+
+# Load environment
+env_file = project_root / '.env'
 if env_file.exists():
     load_dotenv(dotenv_path=env_file)
     print(f"Loaded .env file from: {env_file}")
 else:
-    # Try loading from current working directory as fallback
     load_dotenv()
     print("Warning: No .env file found at project root, trying current directory")
 
-# Setup import path and error handling
-src_path = str(project_root / "src")
-if src_path not in sys.path:
-    sys.path.insert(0, src_path)
-
-# Setup enhanced error handling for imports
+# Import required modules with error handling
 try:
-    from utils.import_helper import setup_import_error_handler
-    setup_import_error_handler()
-except ImportError:
-    # Fallback if import_helper is not available
-    pass
-
-from config import WazuhConfig
-from api.wazuh_client_manager import WazuhClientManager
+    from config import WazuhConfig
+    from api.wazuh_client_manager import WazuhClientManager
+    print("✅ All modules imported successfully")
+except ImportError as e:
+    print(f"❌ Import Error: {e}")
+    print("\n🔍 Debugging Information:")
+    print(f"  Python path: {sys.path}")
+    print(f"  Project root: {project_root}")
+    print(f"  Src directory exists: {(project_root / 'src').exists()}")
+    print(f"  Config file exists: {(project_root / 'src' / 'config.py').exists()}")
+    print(f"  Working directory: {os.getcwd()}")
+    
+    # Try to provide helpful suggestions
+    print("\n💡 Suggestions:")
+    print("  1. Run from project root: cd /path/to/wazuh-mcp-server")
+    print("  2. Install package: pip install -e .")
+    print("  3. Use module execution: python -m scripts.test_connection")
+    raise
 
 
 async def test_connection():

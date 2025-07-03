@@ -267,3 +267,24 @@ class TestWazuhMCPServer:
             assert "risk_score" in response_data
             assert "risk_level" in response_data
             assert "factors" in response_data
+
+    @pytest.mark.asyncio
+    async def test_handle_get_agent_processes(self, server):
+        """Test get_agent_processes tool handler."""
+        with patch.object(server.api_client.server_client, 'get_agent_processes') as mock_get_agent_processes:
+            mock_get_agent_processes.return_value = {
+                "data": {"affected_items": [{"name": "test_process"}], "total_affected_items": 1}
+            }
+
+            arguments = {"agent_id": "001"}
+            result = await server._handle_get_agent_processes(arguments)
+
+            assert len(result) == 1
+            assert result[0].type == "text"
+
+            # Parse the JSON response
+            response_data = json.loads(result[0].text)
+            assert "data" in response_data
+            assert "affected_items" in response_data["data"]
+            assert len(response_data["data"]["affected_items"]) == 1
+            assert response_data["data"]["affected_items"][0]["name"] == "test_process"

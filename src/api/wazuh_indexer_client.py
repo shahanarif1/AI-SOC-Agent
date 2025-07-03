@@ -17,6 +17,8 @@ from ..utils.logging import get_logger, log_performance, LogContext
 from ..utils.rate_limiter import global_rate_limiter, RateLimitConfig
 from ..utils.validation import validate_alert_query, sanitize_string
 from ..utils.production_error_handler import production_error_handler
+from ..utils.ssl_config import SSLConfigurationManager, SSLConfig
+from ..utils.error_recovery import error_recovery_manager
 from .wazuh_field_mappings import WazuhFieldMapper, WazuhVersion
 
 logger = get_logger(__name__)
@@ -71,30 +73,50 @@ class WazuhIndexerClient:
         })
     
     def _validate_ssl_config(self):
-        """Validate SSL/TLS configuration with user-friendly messaging."""
-        if not self.verify_ssl:
-            logger.info("SSL verification disabled for maximum compatibility with all certificate types", extra={
+        """Validate SSL/TLS configuration using production-grade SSL manager."""
+        # Create SSL configuration from indexer settings
+        ssl_config = SSLConfig(
+            verify_ssl=self.verify_ssl,
+            ca_bundle_path=getattr(self.config, 'indexer_ca_bundle_path', None),
+            client_cert_path=getattr(self.config, 'indexer_client_cert_path', None),
+            client_key_path=getattr(self.config, 'indexer_client_key_path', None),
+            allow_self_signed=getattr(self.config, 'indexer_allow_self_signed', True),
+            ssl_timeout=getattr(self.config, 'ssl_timeout', 30),
+            auto_detect_issues=getattr(self.config, 'indexer_auto_detect_ssl_issues', True)
+        )
+        
+        # Initialize SSL manager and validate configuration
+        self.ssl_manager = SSLConfigurationManager()
+        is_valid = self.ssl_manager.validate_ssl_config(ssl_config)
+        
+        if not is_valid:
+            logger.warning("SSL configuration has security issues", extra={
                 "details": {
                     "host": self.host,
                     "port": self.port,
-                    "compatibility": "high",
-                    "note": "This allows connection to self-signed, internal CA, and commercial certificates"
+                    "verify_ssl": self.verify_ssl,
+                    "allow_self_signed": ssl_config.allow_self_signed
                 }
             })
         
-        # Check for localhost/internal networks - more permissive messaging
-        if not self.verify_ssl and not (
-            self.host in ['localhost', '127.0.0.1'] or 
-            self.host.startswith('192.168.') or
-            self.host.startswith('10.') or
-            self.host.startswith('172.')
-        ):
-            logger.info("SSL verification disabled for external host - ensure this is intended", extra={
-                "details": {
-                    "host": self.host,
-                    "note": "For production with commercial certificates, consider setting VERIFY_SSL=true"
-                }
-            })
+        # Auto-detect SSL issues if enabled
+        if ssl_config.auto_detect_issues and self.verify_ssl:
+            try:
+                detection_results = self.ssl_manager.auto_detect_ssl_issues(self.host, self.port)
+                if detection_results.get("recommendations"):
+                    logger.info("SSL auto-detection completed", extra={
+                        "details": {
+                            "ssl_available": detection_results.get("ssl_available"),
+                            "certificate_valid": detection_results.get("certificate_valid"),
+                            "self_signed": detection_results.get("self_signed"),
+                            "recommendations": detection_results.get("recommendations")
+                        }
+                    })
+            except Exception as e:
+                logger.debug(f"SSL auto-detection failed: {e}")
+        
+        # Store SSL config for session creation
+        self._ssl_config = ssl_config
     
     async def __aenter__(self):
         """Async context manager entry."""
@@ -108,26 +130,18 @@ class WazuhIndexerClient:
             logger.debug("Wazuh Indexer client session closed")
     
     async def _create_session(self):
-        """Create aiohttp session with proper SSL configuration."""
-        from ..utils.ssl_helper import SSLConfig
-        
+        """Create aiohttp session with production-grade SSL configuration."""
         timeout = aiohttp.ClientTimeout(total=self.config.request_timeout_seconds)
         
-        # Create SSL configuration with user-friendly defaults
-        ssl_config = SSLConfig(
-            verify_ssl=self.verify_ssl,
-            ca_bundle_path=getattr(self.config, 'indexer_ca_bundle_path', None),
-            client_cert_path=getattr(self.config, 'indexer_client_cert_path', None),
-            client_key_path=getattr(self.config, 'indexer_client_key_path', None),
-            allow_self_signed=getattr(self.config, 'indexer_allow_self_signed', True),  # Default to True
-            ssl_timeout=getattr(self.config, 'ssl_timeout', 30),
-            auto_detect_ssl_issues=getattr(self.config, 'indexer_auto_detect_ssl_issues', True)
-        )
+        # Get SSL connector arguments from SSL manager
+        connector_args = self.ssl_manager.get_aiohttp_connector_args(self._ssl_config)
         
-        # Create connector with SSL configuration
-        connector = ssl_config.create_aiohttp_connector()
-        connector.limit = self.config.max_connections
-        connector.limit_per_host = self.config.pool_size
+        # Create connector with SSL configuration and connection limits
+        connector = aiohttp.TCPConnector(
+            limit=self.config.max_connections,
+            limit_per_host=self.config.pool_size,
+            **connector_args
+        )
         
         self.session = aiohttp.ClientSession(
             connector=connector,
@@ -136,7 +150,13 @@ class WazuhIndexerClient:
             auth=aiohttp.BasicAuth(self.username, self.password)
         )
         
-        logger.debug("Created Wazuh Indexer session with enhanced SSL configuration")
+        logger.debug("Created Wazuh Indexer session with production-grade SSL configuration", extra={
+            "details": {
+                "ssl_verification": self._ssl_config.verify_ssl,
+                "max_connections": self.config.max_connections,
+                "pool_size": self.config.pool_size
+            }
+        })
     
     async def _request(
         self, 
@@ -186,12 +206,12 @@ class WazuhIndexerClient:
                         response_data = None
                         try:
                             response_data = await response.json()
-                        except:
+                        except (aiohttp.ClientError, json.JSONDecodeError, ValueError):
                             # Try to get text response for better error details
                             try:
                                 response_text = await response.text()
                                 response_data = {"error": response_text}
-                            except:
+                            except (aiohttp.ClientError, UnicodeDecodeError):
                                 response_data = {"error": f"HTTP {response.status}"}
                         
                         # Enhanced error logging for production
@@ -214,13 +234,28 @@ class WazuhIndexerClient:
                     
                     return result
         
-        # Use production error handler with retry logic
-        return await production_error_handler.execute_with_retry(
-            _make_request,
-            f"indexer_{method.lower()}",
-            "indexer",
-            endpoint
-        )
+        # Use production error handler with retry logic and recovery
+        try:
+            return await production_error_handler.execute_with_retry(
+                _make_request,
+                f"indexer_{method.lower()}",
+                "indexer",
+                endpoint
+            )
+        except Exception as e:
+            # Use error recovery manager for intelligent recovery
+            recovery_result = await error_recovery_manager.handle_error(
+                e,
+                f"wazuh_indexer_{method.lower()}",
+                retry_func=_make_request,
+                context={"endpoint": endpoint, "method": method, "data": data}
+            )
+            
+            if recovery_result.get("success"):
+                return recovery_result.get("data")
+            else:
+                # Re-raise if recovery failed
+                raise
     
     def _validate_response_structure(self, response: Dict[str, Any], endpoint: str):
         """Validate Indexer API response structure for production compatibility."""
@@ -466,8 +501,8 @@ class WazuhIndexerClient:
         }
     
     async def health_check(self) -> Dict[str, Any]:
-        """Perform health check of Wazuh Indexer."""
-        try:
+        """Perform health check of Wazuh Indexer with error recovery."""
+        async def _do_health_check() -> Dict[str, Any]:
             result = await self._request("GET", "/_cluster/health")
             
             health_data = {
@@ -485,8 +520,22 @@ class WazuhIndexerClient:
             
             logger.info("Indexer health check passed", extra={"details": health_data})
             return health_data
-            
+        
+        try:
+            return await _do_health_check()
         except Exception as e:
+            # Use error recovery for health checks
+            recovery_result = await error_recovery_manager.handle_error(
+                e,
+                "wazuh_indexer_health_check",
+                retry_func=_do_health_check,
+                context={"host": self.host, "port": self.port}
+            )
+            
+            if recovery_result.get("success"):
+                return recovery_result.get("data")
+            
+            # Fallback to degraded health status
             health_data = {
                 "status": "unhealthy",
                 "error": str(e),
@@ -494,10 +543,11 @@ class WazuhIndexerClient:
                     "total_requests": self.request_count,
                     "error_count": self.error_count
                 },
-                "last_check": datetime.utcnow().isoformat()
+                "last_check": datetime.utcnow().isoformat(),
+                "recovery_attempted": True
             }
             
-            logger.error("Indexer health check failed", extra={"details": health_data})
+            logger.error("Indexer health check failed after recovery attempts", extra={"details": health_data})
             return health_data
     
     def get_metrics(self) -> Dict[str, Any]:

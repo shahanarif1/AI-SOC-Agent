@@ -1,6 +1,7 @@
 """Enhanced Wazuh API client with comprehensive error handling and security features."""
 
 import asyncio
+import json
 import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Tuple
@@ -15,6 +16,7 @@ from ..utils.exceptions import (
 from ..utils.logging import get_logger, log_performance, LogContext
 from ..utils.rate_limiter import global_rate_limiter, RateLimitConfig
 from ..utils.validation import validate_alert_query, validate_agent_query, sanitize_string
+from ..utils.error_recovery import error_recovery_manager
 
 logger = get_logger(__name__)
 
@@ -87,19 +89,19 @@ class WazuhAPIClient:
     
     @log_performance
     async def authenticate(self, force_refresh: bool = False) -> str:
-        """Authenticate with Wazuh API and get JWT token."""
+        """Authenticate with Wazuh API and get JWT token with error recovery."""
         if not force_refresh and self._is_jwt_valid():
             return self.jwt_token
         
-        # Rate limit authentication attempts
-        await global_rate_limiter.enforce_rate_limit("wazuh_auth")
-        
-        auth_url = urljoin(self.base_url, "/security/user/authenticate")
-        auth = aiohttp.BasicAuth(self.config.username, self.config.password)
-        
-        request_id = f"auth_{int(time.time())}"
-        
-        try:
+        async def _do_authenticate() -> str:
+            # Rate limit authentication attempts
+            await global_rate_limiter.enforce_rate_limit("wazuh_auth")
+            
+            auth_url = urljoin(self.base_url, "/security/user/authenticate")
+            auth = aiohttp.BasicAuth(self.config.username, self.config.password)
+            
+            request_id = f"auth_{int(time.time())}"
+            
             with LogContext(request_id, user_id=self.config.username):
                 logger.info("Authenticating with Wazuh API", extra={
                     "details": {"url": auth_url, "username": self.config.username}
@@ -110,8 +112,9 @@ class WazuhAPIClient:
                         response_data = None
                         try:
                             response_data = await response.json()
-                        except:
-                            pass
+                        except (aiohttp.ClientError, json.JSONDecodeError, ValueError) as e:
+                            logger.warning(f"Failed to parse JSON response: {e}")
+                            response_data = {"error": "Invalid response format"}
                         handle_api_error(response.status, response_data)
                     
                     data = await response.json()
@@ -129,14 +132,29 @@ class WazuhAPIClient:
                     })
                     
                     return self.jwt_token
-                    
+        
+        try:
+            return await _do_authenticate()
         except aiohttp.ClientError as e:
-            handle_connection_error(e, auth_url)
+            handle_connection_error(e, urljoin(self.base_url, "/security/user/authenticate"))
         except Exception as e:
-            logger.error(f"Unexpected authentication error: {str(e)}")
+            # Use error recovery for authentication failures
+            recovery_result = await error_recovery_manager.handle_error(
+                e,
+                "wazuh_authentication",
+                retry_func=_do_authenticate,
+                context={"username": self.config.username, "force_refresh": force_refresh}
+            )
+            
+            if recovery_result.get("success"):
+                token = recovery_result.get("data")
+                if token:
+                    return token
+            
+            logger.error(f"Authentication failed after recovery attempts: {str(e)}")
             raise AuthenticationError(f"Authentication failed: {str(e)}")
     
-    async def _request(
+    async def _make_request_internal(
         self, 
         method: str, 
         endpoint: str, 
@@ -144,8 +162,7 @@ class WazuhAPIClient:
         data: Optional[Dict[str, Any]] = None,
         retry_auth: bool = True
     ) -> Dict[str, Any]:
-        """Make authenticated API request with comprehensive error handling."""
-        
+        """Internal method to make authenticated API request."""
         # Rate limit API requests
         await global_rate_limiter.enforce_rate_limit("wazuh_api")
         
@@ -158,60 +175,84 @@ class WazuhAPIClient:
         url = urljoin(self.base_url, endpoint)
         request_id = f"req_{int(time.time() * 1000)}"
         
-        try:
-            with LogContext(request_id):
-                logger.debug(f"Making {method} request to {endpoint}", extra={
-                    "details": {"params": params, "endpoint": endpoint}
-                })
+        with LogContext(request_id):
+            logger.debug(f"Making {method} request to {endpoint}", extra={
+                "details": {"params": params, "endpoint": endpoint}
+            })
+            
+            kwargs = {"headers": headers}
+            if params:
+                kwargs["params"] = params
+            if data:
+                kwargs["json"] = data
+            
+            async with self.session.request(method, url, **kwargs) as response:
+                self.request_count += 1
                 
-                kwargs = {"headers": headers}
-                if params:
-                    kwargs["params"] = params
-                if data:
-                    kwargs["json"] = data
-                
-                async with self.session.request(method, url, **kwargs) as response:
-                    self.request_count += 1
+                # Handle authentication retry
+                if response.status == 401 and retry_auth:
+                    logger.info("Token expired, re-authenticating...")
+                    token = await self.authenticate(force_refresh=True)
+                    headers["Authorization"] = f"Bearer {token}"
+                    kwargs["headers"] = headers
                     
-                    # Handle authentication retry
-                    if response.status == 401 and retry_auth:
-                        logger.info("Token expired, re-authenticating...")
-                        token = await self.authenticate(force_refresh=True)
-                        headers["Authorization"] = f"Bearer {token}"
-                        kwargs["headers"] = headers
+                    async with self.session.request(method, url, **kwargs) as retry_response:
+                        if retry_response.status != 200:
+                            response_data = None
+                            try:
+                                response_data = await retry_response.json()
+                            except:
+                                pass
+                            handle_api_error(retry_response.status, response_data)
                         
-                        async with self.session.request(method, url, **kwargs) as retry_response:
-                            if retry_response.status != 200:
-                                response_data = None
-                                try:
-                                    response_data = await retry_response.json()
-                                except:
-                                    pass
-                                handle_api_error(retry_response.status, response_data)
-                            
-                            result = await retry_response.json()
-                            logger.debug(f"Request completed successfully after auth retry")
-                            return result
-                    
-                    if response.status != 200:
-                        response_data = None
-                        try:
-                            response_data = await response.json()
-                        except:
-                            pass
-                        handle_api_error(response.status, response_data)
-                    
-                    result = await response.json()
-                    logger.debug(f"Request completed successfully")
-                    return result
-                    
+                        result = await retry_response.json()
+                        logger.debug(f"Request completed successfully after auth retry")
+                        return result
+                
+                if response.status != 200:
+                    response_data = None
+                    try:
+                        response_data = await response.json()
+                    except (aiohttp.ClientError, json.JSONDecodeError, ValueError) as e:
+                        logger.warning(f"Failed to parse JSON response: {e}")
+                        response_data = {"error": "Invalid response format"}
+                    handle_api_error(response.status, response_data)
+                
+                result = await response.json()
+                logger.debug(f"Request completed successfully")
+                return result
+    
+    async def _request(
+        self, 
+        method: str, 
+        endpoint: str, 
+        params: Optional[Dict[str, Any]] = None,
+        data: Optional[Dict[str, Any]] = None,
+        retry_auth: bool = True
+    ) -> Dict[str, Any]:
+        """Make authenticated API request with comprehensive error handling and recovery."""
+        
+        try:
+            return await self._make_request_internal(method, endpoint, params, data, retry_auth)
         except aiohttp.ClientError as e:
             self.error_count += 1
-            handle_connection_error(e, url)
+            handle_connection_error(e, urljoin(self.base_url, endpoint))
         except Exception as e:
             self.error_count += 1
             logger.error(f"Unexpected API error: {str(e)}")
-            raise APIError(f"API request failed: {str(e)}")
+            
+            # Use error recovery manager for intelligent recovery
+            recovery_result = await error_recovery_manager.handle_error(
+                e,
+                f"wazuh_server_{method.lower()}",
+                retry_func=lambda: self._make_request_internal(method, endpoint, params, data, retry_auth=False),
+                context={"endpoint": endpoint, "method": method, "params": params}
+            )
+            
+            if recovery_result.get("success"):
+                return recovery_result.get("data")
+            else:
+                raise APIError(f"API request failed: {str(e)}")
     
     @log_performance
     async def get_alerts(
@@ -335,10 +376,73 @@ class WazuhAPIClient:
         logger.info(f"Fetching stats for agent {clean_agent_id}")
         
         return await self._request("GET", f"/agents/{clean_agent_id}/stats/logcollector")
+
+    @log_performance
+    async def get_agent_processes(self, agent_id: str) -> Dict[str, Any]:
+        """Get running processes for a specific agent."""
+        
+        clean_agent_id = sanitize_string(agent_id, 20)
+        if not clean_agent_id:
+            raise ValueError("Invalid agent ID")
+        
+        logger.info(f"Fetching processes for agent {clean_agent_id}")
+        
+        return await self._request("GET", f"/syscollector/{clean_agent_id}/processes")
+
+    @log_performance
+    async def get_agent_ports(self, agent_id: str) -> Dict[str, Any]:
+        """Get open ports for a specific agent."""
+        
+        clean_agent_id = sanitize_string(agent_id, 20)
+        if not clean_agent_id:
+            raise ValueError("Invalid agent ID")
+        
+        logger.info(f"Fetching ports for agent {clean_agent_id}")
+        
+        return await self._request("GET", f"/syscollector/{clean_agent_id}/ports")
+
+    @log_performance
+    async def get_wazuh_stats(self, component: str, stat_type: str, agent_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get statistics from Wazuh."""
+        if component == "manager":
+            endpoint = f"/manager/stats/{stat_type}"
+            logger.info(f"Fetching manager stats for {stat_type}")
+        elif component == "agent":
+            if not agent_id:
+                raise ValueError("agent_id is required for agent stats")
+            clean_agent_id = sanitize_string(agent_id, 20)
+            if not clean_agent_id:
+                raise ValueError("Invalid agent ID")
+            endpoint = f"/agents/{clean_agent_id}/stats/{stat_type}"
+            logger.info(f"Fetching agent stats for {stat_type} on agent {clean_agent_id}")
+        else:
+            raise ValueError(f"Invalid component: {component}")
+
+        return await self._request("GET", endpoint)
+
+    @log_performance
+    async def search_wazuh_logs(self, log_source: str, query: str, limit: int = 100, agent_id: Optional[str] = None) -> Dict[str, Any]:
+        """Search Wazuh logs."""
+        params = {"limit": limit, "q": query}
+        if log_source == "manager":
+            endpoint = "/manager/logs"
+            logger.info(f"Searching manager logs for '{query}'")
+        elif log_source == "agent":
+            if not agent_id:
+                raise ValueError("agent_id is required for agent logs")
+            clean_agent_id = sanitize_string(agent_id, 20)
+            if not clean_agent_id:
+                raise ValueError("Invalid agent ID")
+            endpoint = f"/agents/{clean_agent_id}/logs"
+            logger.info(f"Searching agent logs for '{query}' on agent {clean_agent_id}")
+        else:
+            raise ValueError(f"Invalid log_source: {log_source}")
+
+        return await self._request("GET", endpoint, params=params)
     
     async def health_check(self) -> Dict[str, Any]:
-        """Perform health check of Wazuh API and client."""
-        try:
+        """Perform health check of Wazuh API and client with error recovery."""
+        async def _do_health_check() -> Dict[str, Any]:
             # Basic connectivity test
             result = await self._request("GET", "/")
             
@@ -361,8 +465,22 @@ class WazuhAPIClient:
             self.last_health_check = datetime.utcnow()
             logger.info("Health check passed", extra={"details": health_data})
             return health_data
-            
+        
+        try:
+            return await _do_health_check()
         except Exception as e:
+            # Use error recovery for health checks
+            recovery_result = await error_recovery_manager.handle_error(
+                e,
+                "wazuh_health_check",
+                retry_func=_do_health_check,
+                context={"host": self.config.host, "port": self.config.port}
+            )
+            
+            if recovery_result.get("success"):
+                return recovery_result.get("data")
+            
+            # Fallback to degraded health status
             health_data = {
                 "status": "unhealthy",
                 "error": str(e),
@@ -370,16 +488,22 @@ class WazuhAPIClient:
                     "total_requests": self.request_count,
                     "error_count": self.error_count
                 },
-                "last_check": datetime.utcnow().isoformat()
+                "last_check": datetime.utcnow().isoformat(),
+                "recovery_attempted": True
             }
             
-            logger.error("Health check failed", extra={"details": health_data})
+            logger.error("Health check failed after recovery attempts", extra={"details": health_data})
             return health_data
     
     async def get_cluster_info(self) -> Dict[str, Any]:
         """Get Wazuh cluster information."""
         logger.info("Fetching cluster information")
         return await self._request("GET", "/cluster/status")
+
+    async def get_cluster_nodes(self) -> Dict[str, Any]:
+        """Get Wazuh cluster nodes information."""
+        logger.info("Fetching cluster nodes information")
+        return await self._request("GET", "/cluster/nodes")
     
     async def restart_agent(self, agent_id: str) -> Dict[str, Any]:
         """Restart a specific agent."""

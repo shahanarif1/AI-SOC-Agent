@@ -1,10 +1,9 @@
 {
-  "dxt_version": "0.1",
   "name": "wazuh-mcp-server",
   "version": "2.0.0",
   "display_name": "Wazuh MCP Server",
   "description": "AI-powered security operations with Wazuh SIEM integration",
-  "long_description": "Transform your security operations with AI-powered threat detection, automated incident response, and natural language security analysis. This Desktop Extension provides seamless integration between Wazuh SIEM and Claude Desktop, enabling security teams to interact with their security infrastructure using natural language queries.",
+  "long_description": "Transform your security operations with AI-powered threat detection, automated incident response, and natural language security analysis. This MCP server provides seamless integration between Wazuh SIEM and Claude, enabling security teams to interact with their security infrastructure using natural language queries.",
   "author": {
     "name": "Security Team",
     "email": "security@gensecai.com",

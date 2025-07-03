@@ -115,6 +115,7 @@ class WazuhConfig(BaseModel):
     enable_compliance_checking: bool = Field(default=True)
     enable_experimental: bool = Field(default=False)
     
+
     # Logging configuration
     debug: bool = Field(default=False)
     log_level: str = Field(default="INFO")
@@ -218,6 +219,7 @@ class WazuhConfig(BaseModel):
                 enable_compliance_checking=os.getenv("ENABLE_COMPLIANCE_CHECKING", "true").lower() == "true",
                 enable_experimental=os.getenv("ENABLE_EXPERIMENTAL", "false").lower() == "true",
                 
+
                 # Logging
                 debug=os.getenv("DEBUG", "false").lower() == "true",
                 log_level=os.getenv("LOG_LEVEL", "INFO"),

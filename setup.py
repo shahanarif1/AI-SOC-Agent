@@ -29,7 +29,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "wazuh-mcp-server=wazuh_mcp_server:main",
+            "wazuh-mcp-server=src.wazuh_mcp_server:main",
             "wazuh-mcp-test=scripts.test_connection:main",
         ],
     },

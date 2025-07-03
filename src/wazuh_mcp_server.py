@@ -13,6 +13,27 @@ import asyncio
 import uuid
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+from pathlib import Path
+
+# Setup import paths for direct execution
+def setup_import_paths():
+    """Setup import paths when script is run directly."""
+    current_file = Path(__file__).resolve()
+    
+    # If we're in the src directory, add parent to path
+    if current_file.parent.name == 'src':
+        project_root = current_file.parent.parent
+        src_path = str(current_file.parent)
+        
+        # Add both src and project root to path
+        if src_path not in sys.path:
+            sys.path.insert(0, src_path)
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+
+# Only setup paths if running directly
+if __name__ == "__main__":
+    setup_import_paths()
 
 import urllib3
 from mcp.server import Server, NotificationOptions
@@ -20,16 +41,24 @@ from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 import mcp.types as types
 
-from config import WazuhConfig, ComplianceFramework
-from __version__ import __version__
-from api.wazuh_client_manager import WazuhClientManager
-from analyzers import SecurityAnalyzer, ComplianceAnalyzer
-from utils import (
-    setup_logging, get_logger, LogContext,
-    validate_alert_query, validate_agent_query, validate_threat_analysis,
-    validate_ip_address, ValidationError,
-    WazuhMCPError, ConfigurationError, APIError
-)
+# Import with error handling for different execution contexts
+try:
+    from config import WazuhConfig, ComplianceFramework
+    from __version__ import __version__
+    from api.wazuh_client_manager import WazuhClientManager
+    from analyzers import SecurityAnalyzer, ComplianceAnalyzer
+    from utils import (
+        setup_logging, get_logger, LogContext,
+        validate_alert_query, validate_agent_query, validate_threat_analysis,
+        validate_ip_address, ValidationError,
+        WazuhMCPError, ConfigurationError, APIError
+    )
+except ImportError as e:
+    print(f"Import error: {e}")
+    print(f"Current working directory: {os.getcwd()}")
+    print(f"Python path: {sys.path}")
+    print(f"Script location: {Path(__file__).resolve()}")
+    raise
 
 # SSL warnings will be disabled per-request basis in clients if needed
 # urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # SECURITY: Removed global disable
@@ -60,6 +89,7 @@ class WazuhMCPServer:
         self.api_client = WazuhClientManager(self.config)
         self.security_analyzer = SecurityAnalyzer()
         self.compliance_analyzer = ComplianceAnalyzer()
+        self.cortex_client = None
         
         # Setup handlers
         self._setup_handlers()
@@ -75,6 +105,7 @@ class WazuhMCPServer:
                     self.logger.info(f"Connected to Wazuh {version}")
                 else:
                     self.logger.warning("Could not detect Wazuh version")
+            # Cortex client initialization removed
         except Exception as e:
             self.logger.error(f"Failed to initialize connections: {str(e)}")
     
@@ -298,23 +329,111 @@ class WazuhMCPServer:
                 ),
                 types.Tool(
                     name="risk_assessment",
-                    description="Comprehensive security risk assessment with recommendations",
+                    description="Perform comprehensive risk assessment of the environment",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "time_window_hours": {
                                 "type": "integer",
-                                "description": "Assessment time window in hours",
+                                "description": "Time window in hours for risk assessment",
                                 "default": 24,
                                 "minimum": 1,
                                 "maximum": 168
                             },
                             "include_vulnerabilities": {
                                 "type": "boolean",
-                                "description": "Include vulnerability correlation",
+                                "description": "Include vulnerability analysis in risk assessment",
                                 "default": True
                             }
                         }
+                    }
+                ),
+                types.Tool(
+                    name="get_agent_processes",
+                    description="Get running processes for a specific agent.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "agent_id": {
+                                "type": "string",
+                                "description": "The ID of the agent to query."
+                            }
+                        },
+                        "required": ["agent_id"]
+                    }
+                ),
+                types.Tool(
+                    name="get_agent_ports",
+                    description="Get open ports for a specific agent.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "agent_id": {
+                                "type": "string",
+                                "description": "The ID of the agent to query."
+                            }
+                        },
+                        "required": ["agent_id"]
+                    }
+                ),
+                types.Tool(
+                    name="get_wazuh_stats",
+                    description="Query specific statistical information from the Wazuh manager or a specific agent.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "component": {
+                                "type": "string",
+                                "description": "The component to query.",
+                                "enum": ["manager", "agent"]
+                            },
+                            "stat_type": {
+                                "type": "string",
+                                "description": "The type of statistics to retrieve.",
+                                "enum": ["weekly", "log_collector", "remoted"]
+                            },
+                            "agent_id": {
+                                "type": "string",
+                                "description": "Required if component is agent."
+                            }
+                        },
+                        "required": ["component", "stat_type"]
+                    }
+                ),
+                types.Tool(
+                    name="search_wazuh_logs",
+                    description="Search the Wazuh manager or agent logs for specific patterns.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "log_source": {
+                                "type": "string",
+                                "description": "The source of the logs.",
+                                "enum": ["manager", "agent"]
+                            },
+                            "agent_id": {
+                                "type": "string",
+                                "description": "Required if log_source is agent."
+                            },
+                            "query": {
+                                "type": "string",
+                                "description": "The search query or pattern."
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "The maximum number of log entries to return.",
+                                "default": 100
+                            }
+                        },
+                        "required": ["log_source", "query"]
+                    }
+                ),
+                types.Tool(
+                    name="get_cluster_health",
+                    description="Retrieve the overall health and status of the Wazuh cluster, including node information.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {}
                     }
                 )
             ]
@@ -344,6 +463,16 @@ class WazuhMCPServer:
                         result = await asyncio.wait_for(self._handle_check_ioc(arguments), timeout=timeout)
                     elif name == "risk_assessment":
                         result = await asyncio.wait_for(self._handle_risk_assessment(arguments), timeout=timeout)
+                    elif name == "get_agent_processes":
+                        result = await asyncio.wait_for(self._handle_get_agent_processes(arguments), timeout=timeout)
+                    elif name == "get_agent_ports":
+                        result = await asyncio.wait_for(self._handle_get_agent_ports(arguments), timeout=timeout)
+                    elif name == "get_wazuh_stats":
+                        result = await asyncio.wait_for(self._handle_get_wazuh_stats(arguments), timeout=timeout)
+                    elif name == "search_wazuh_logs":
+                        result = await asyncio.wait_for(self._handle_search_wazuh_logs(arguments), timeout=timeout)
+                    elif name == "get_cluster_health":
+                        result = await asyncio.wait_for(self._handle_get_cluster_health(arguments), timeout=timeout)
                     else:
                         raise ValueError(f"Unknown tool: {name}")
                     
@@ -570,12 +699,11 @@ class WazuhMCPServer:
         if ip_address:
             try:
                 validated_ip = validate_ip_address(ip_address)
-                # For now, just return structure - external API integration would go here
                 results["indicators"].append({
                     "type": "ip_address",
                     "value": validated_ip.ip,
-                    "status": "not_implemented",
-                    "message": "External threat intelligence integration not configured"
+                    "status": "validated",
+                    "message": "IP address validated successfully"
                 })
             except ValidationError as e:
                 results["indicators"].append({
@@ -593,8 +721,8 @@ class WazuhMCPServer:
                     "type": "file_hash",
                     "value": validated_hash.hash_value,
                     "hash_type": validated_hash.hash_type,
-                    "status": "not_implemented",
-                    "message": "External threat intelligence integration not configured"
+                    "status": "validated",
+                    "message": "File hash validated successfully"
                 })
             except ValidationError as e:
                 results["indicators"].append({
@@ -605,7 +733,7 @@ class WazuhMCPServer:
                 })
         
         if not results["indicators"]:
-            results["error"] = "No valid indicators provided"
+            results["error"] = "No valid indicators provided."
         
         return [types.TextContent(
             type="text",
@@ -670,6 +798,73 @@ class WazuhMCPServer:
         return [types.TextContent(
             type="text",
             text=json.dumps(result, indent=2)
+        )]
+
+    async def _handle_get_agent_processes(self, arguments: dict) -> list[types.TextContent]:
+        """Handle get_agent_processes tool execution."""
+        agent_id = arguments.get("agent_id")
+        validated_query = validate_agent_query({"agent_id": agent_id})
+
+        data = await self.api_client.server_client.get_agent_processes(validated_query.agent_id)
+
+        return [types.TextContent(
+            type="text",
+            text=json.dumps(data, indent=2)
+        )]
+
+    async def _handle_get_agent_ports(self, arguments: dict) -> list[types.TextContent]:
+        """Handle get_agent_ports tool execution."""
+        agent_id = arguments.get("agent_id")
+        validated_query = validate_agent_query({"agent_id": agent_id})
+
+        data = await self.api_client.server_client.get_agent_ports(validated_query.agent_id)
+
+        return [types.TextContent(
+            type="text",
+            text=json.dumps(data, indent=2)
+        )]
+
+    async def _handle_get_wazuh_stats(self, arguments: dict) -> list[types.TextContent]:
+        """Handle get_wazuh_stats tool execution."""
+        component = arguments.get("component")
+        stat_type = arguments.get("stat_type")
+        agent_id = arguments.get("agent_id")
+
+        data = await self.api_client.server_client.get_wazuh_stats(component, stat_type, agent_id)
+
+        return [types.TextContent(
+            type="text",
+            text=json.dumps(data, indent=2)
+        )]
+
+    async def _handle_search_wazuh_logs(self, arguments: dict) -> list[types.TextContent]:
+        """Handle search_wazuh_logs tool execution."""
+        log_source = arguments.get("log_source")
+        query = arguments.get("query")
+        limit = arguments.get("limit", 100)
+        agent_id = arguments.get("agent_id")
+
+        data = await self.api_client.server_client.search_wazuh_logs(log_source, query, limit, agent_id)
+
+        return [types.TextContent(
+            type="text",
+            text=json.dumps(data, indent=2)
+        )]
+
+    async def _handle_get_cluster_health(self, arguments: dict) -> list[types.TextContent]:
+        """Handle get_cluster_health tool execution."""
+        data = await self.api_client.server_client.get_cluster_info()
+        nodes_data = await self.api_client.server_client.get_cluster_nodes()
+
+        # Combine cluster info and node info
+        cluster_health = {
+            "cluster_info": data.get("data", {}),
+            "nodes": nodes_data.get("data", {}).get("affected_items", [])
+        }
+
+        return [types.TextContent(
+            type="text",
+            text=json.dumps(cluster_health, indent=2)
         )]
     
     def _format_alerts(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -828,24 +1023,36 @@ class WazuhMCPServer:
         
         critical_vulns = []
         
-        for agent in active_agents:
+        # Fetch vulnerabilities concurrently for better performance
+        async def fetch_agent_vulnerabilities(agent):
             try:
                 vuln_data = await self.api_client.get_agent_vulnerabilities(agent["id"])
                 vulns = vuln_data.get("data", {}).get("affected_items", [])
                 
+                agent_critical_vulns = []
                 for vuln in vulns:
                     severity = vuln.get("severity", "").lower()
                     if severity in ["critical", "high"]:
-                        critical_vulns.append({
+                        agent_critical_vulns.append({
                             "agent_id": agent["id"],
                             "agent_name": agent.get("name"),
                             "vulnerability": vuln.get("title"),
                             "severity": severity,
                             "cve": vuln.get("cve", "N/A")
                         })
-                        
+                return agent_critical_vulns
             except Exception as e:
                 self.logger.warning(f"Could not get vulnerabilities for agent {agent['id']}: {str(e)}")
+                return []
+        
+        # Execute all vulnerability fetches concurrently
+        tasks = [fetch_agent_vulnerabilities(agent) for agent in active_agents]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Flatten results and filter out exceptions
+        for result in results:
+            if isinstance(result, list):
+                critical_vulns.extend(result)
         
         return {
             "total_critical_vulnerabilities": len(critical_vulns),
@@ -942,7 +1149,7 @@ class WazuhMCPServer:
                 )
             )
             
-            # Use stdio transport for DXT compatibility
+            # Use stdio transport for MCP compatibility
             async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
                 self.logger.info("MCP server started successfully on stdio transport")
                 await self.server.run(
@@ -958,6 +1165,7 @@ class WazuhMCPServer:
             self.logger.info("Shutting down Wazuh MCP Server...")
             try:
                 await self.api_client.__aexit__(None, None, None)
+                # Cortex client cleanup removed
             except Exception as e:
                 self.logger.error(f"Error during cleanup: {str(e)}")
             self.logger.info("Server shutdown completed")

@@ -1,20 +1,18 @@
 {
-  "name": "wazuh-mcp-server-dxt",
+  "name": "wazuh-mcp-server",
   "version": "2.0.0",
-  "description": "Desktop Extension for Wazuh MCP Server - AI-powered security operations",
+  "description": "Wazuh MCP Server - AI-powered security operations",
   "main": "src/wazuh_mcp_server.py",
   "scripts": {
     "build": "python -m pip install -r requirements.txt",
     "test": "python -m pytest tests/",
-    "lint": "python -m flake8 src/",
-    "package": "dxt pack ."
+    "lint": "python -m flake8 src/"
   },
   "keywords": [
     "security",
     "siem",
     "wazuh",
     "mcp",
-    "desktop-extension",
     "threat-detection",
     "compliance",
     "cybersecurity"
@@ -35,17 +33,5 @@
   },
   "engines": {
     "python": ">=3.8"
-  },
-  "dxt": {
-    "manifest": "manifest.json",
-    "exclude": [
-      ".git",
-      ".github",
-      "tests",
-      "docs",
-      "*.pyc",
-      "__pycache__",
-      ".env*"
-    ]
   }
 }
