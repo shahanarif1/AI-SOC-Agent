@@ -1,4 +1,4 @@
-# 🛡️ Wazuh MCP Server - AI-Powered Security Operations v2.0.0
+# 🛡️ Wazuh MCP Server - AI-Powered Security Operations v3.0.0
 
 <div align="center">
 
