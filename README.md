@@ -1,4 +1,4 @@
-# 🛡️ Wazuh MCP Server - AI-Powered Security Operations v3.0.0
+# 🛡️ Wazuh MCP Server - Production-Grade AI Security Operations
 
 <div align="center">
 
@@ -8,15 +8,15 @@
 [![Wazuh 4.8.0+](https://img.shields.io/badge/Wazuh-4.8.0+-blue.svg)](https://wazuh.com/)
 [![Production Ready](https://img.shields.io/badge/Status-Production%20Ready-success.svg)](https://github.com/gensecaihq/Wazuh-MCP-Server)
 [![Claude Desktop](https://img.shields.io/badge/Claude-Desktop-purple.svg)](https://claude.ai/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
 **Transform your security operations with AI-powered threat detection, automated incident response, and natural language security analysis.**
 
-[Features](#-key-features) •
+*Production-grade reliability • Enterprise security • Intelligent error recovery*
+
 [Quick Start](#-quick-start) •
-[Documentation](#-documentation) •
-[Contributing](#-contributing) •
-[Roadmap](#-roadmap)
+[Features](#-key-features) •
+[Production Setup](#-production-deployment) •
+[Contributing](#-contributing)
 
 </div>
 
@@ -24,308 +24,385 @@
 
 ## 🎯 What is Wazuh MCP Server?
 
-Wazuh MCP Server bridges the gap between traditional SIEM operations and conversational AI, enabling security teams to interact with their Wazuh infrastructure using natural language through Claude Desktop. This isn't just another integration - it's a paradigm shift in how security operations are conducted.
+Wazuh MCP Server is a **production-grade** integration that bridges traditional SIEM operations with conversational AI, enabling security teams to interact with their Wazuh infrastructure using natural language through Claude Desktop. Built with enterprise reliability in mind, it features intelligent error recovery, robust SSL handling, and comprehensive production monitoring.
 
-### 🤔 Why Should You Care?
+### 🚀 Why Choose This Solution?
 
-- **🚀 10x Faster Incident Response**: Query your security data conversationally instead of writing complex queries
-- **🧠 AI-Enhanced Analysis**: Leverage Claude's reasoning capabilities for threat analysis and correlation
-- **🔄 Automated Workflows**: Convert natural language requests into complex security operations
-- **📊 Real-time Intelligence**: Get instant insights from multiple threat intelligence sources
-- **🎓 Lower Learning Curve**: New team members can be productive immediately without learning query languages
+- **⚡ Production-Ready**: Built with enterprise-grade error recovery and monitoring
+- **🛡️ Security-First**: Comprehensive SSL/TLS handling and secure defaults
+- **🧠 AI-Enhanced**: Leverage Claude's reasoning for advanced threat analysis
+- **🔄 Self-Healing**: Intelligent error recovery with circuit breakers and fallbacks
+- **📊 Real-time Intelligence**: Instant insights from multiple data sources
+- **🎯 Zero-Config**: Works out-of-the-box with any certificate setup
 
 ## 🌟 Key Features
 
-### 🔍 Advanced Threat Detection & Analysis
+### 🔧 Production-Grade Engineering
 
-- **Multi-dimensional Risk Scoring**: Combines alert severity, frequency, vulnerability data, and behavioral patterns
-- **ML-based Anomaly Detection**: Statistical analysis with configurable sensitivity levels
+- **🔄 Intelligent Error Recovery**: Automatic retry, circuit breaker, and fallback mechanisms
+- **🛡️ Enterprise SSL Handling**: Auto-detection and configuration for any certificate type
+- **📊 Comprehensive Monitoring**: Built-in performance metrics and health checks
+- **🌐 Cross-Platform**: Robust import resolution for Windows, Linux, and macOS
+- **⚡ High Performance**: Async operations with connection pooling and rate limiting
+
+### 🔍 Advanced Security Analytics
+
+- **Multi-dimensional Risk Scoring**: Combines alert patterns, vulnerabilities, and threat intelligence
+- **ML-based Anomaly Detection**: Statistical analysis with configurable sensitivity
 - **MITRE ATT&CK Mapping**: Automatic TTP identification and kill chain analysis
-- **Threat Correlation Engine**: Cross-references alerts with external threat intelligence
+- **Threat Correlation Engine**: Cross-references with external threat intelligence
 
 ### 🤖 Natural Language Security Operations
 
 Ask Claude questions like:
 - *"Are we under attack right now?"*
 - *"Show me all privilege escalation attempts in the last 48 hours"*
-- *"Which systems have critical vulnerabilities that are being actively exploited?"*
-- *"Generate an executive report on our security posture"*
+- *"Which systems have critical vulnerabilities being actively exploited?"*
+- *"Generate an executive security report"*
 
 ### 📋 Compliance Automation
 
 - **Multi-Framework Support**: PCI DSS, HIPAA, GDPR, NIST, ISO 27001
 - **Automated Gap Analysis**: Identifies missing controls and generates remediation plans
 - **Continuous Monitoring**: Real-time compliance scoring with trend analysis
-- **Audit-Ready Reports**: Generate compliance evidence with a single command
-
-### 🌐 Threat Intelligence Integration
-
-- **VirusTotal**: File hash reputation and malware analysis
-- **Shodan**: Internet-wide scan data and exposure assessment
-- **AbuseIPDB**: IP reputation and abuse history
-- **Custom Feeds**: Extensible architecture for additional threat feeds
-
-## 🛠️ Technical Architecture
-
-### Core Components
-
-1. **MCP Protocol Handler**: Implements the Model Context Protocol for Claude Desktop communication
-2. **Async API Client**: High-performance, non-blocking Wazuh API interactions
-3. **Analysis Engine**: Advanced security algorithms for threat detection and risk assessment
-4. **Intelligence Aggregator**: Consolidates data from multiple threat intelligence sources
-5. **Compliance Framework**: Modular compliance checking and reporting system
-
-## 📊 Available Tools & Resources
-
-### 🛠️ 14 Powerful Tools
-
-- `get_alerts` - Retrieve and filter security alerts
-- `analyze_threats` - Advanced threat analysis with ML
-- `risk_assessment` - Comprehensive risk scoring
-- `detect_anomalies` - ML-based anomaly detection
-- `check_agent_health` - Agent health monitoring
-- `compliance_check` - Framework compliance validation
-- `check_ioc` - IOC reputation checking
-- `threat_hunt` - Pattern-based threat hunting
-- `create_incident` - Incident management
-- `vulnerability_scan` - Vulnerability assessment
-- And 4 more...
-
-### 📚 7 Real-time Resources
-
-- `wazuh://alerts/recent` - Live security alert feed
-- `wazuh://agents/status` - Agent health dashboard
-- `wazuh://vulnerabilities/critical` - Critical vulnerability tracker
-- `wazuh://compliance/status` - Compliance posture monitor
-- `wazuh://threats/active` - Active threat campaigns
+- **Audit-Ready Reports**: Generate compliance evidence with natural language commands
 
 ## 🚀 Quick Start
 
 ### ⚡ Production Installation (Recommended)
 
 ```bash
-# 1. Clone and enter directory
+# 1. Clone the repository
 git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
 cd Wazuh-MCP-Server
 
-# 2. Install the package (this fixes all import issues)
-pip install -e .
+# 2. Install dependencies
+pip install -r requirements.txt
 
 # 3. Configure environment
 cp .env.example .env
 # Edit .env with your Wazuh credentials
 
-# 4. 🔒 Smart SSL Setup (OPTIONAL - works with ANY certificate type)
-python scripts/run.py ssl-setup    # Auto-configures SSL for your environment
-
-# 5. Test connection
-wazuh-mcp-test
-
-# 6. Start the server
-wazuh-mcp-server
-```
-
-### 🚀 Zero-Configuration SSL Support
-
-**The MCP server works out-of-the-box with ANY certificate type:**
-- ✅ **Self-signed certificates** (development, testing)
-- ✅ **Internal CA certificates** (corporate environments)  
-- ✅ **Commercial certificates** (Let's Encrypt, DigiCert, etc.)
-- ✅ **No certificate configuration required**
-
-**Default behavior**: SSL verification is **disabled** for maximum compatibility. Enable only if you have commercial certificates and need strict security.
-
-### 🔧 Alternative Installation Methods
-
-#### Cross-Platform Launcher (Windows/Linux/macOS)
-```bash
-python scripts/run.py install     # One-time setup
-python scripts/run.py ssl-setup   # Smart SSL configuration (optional)
-python scripts/run.py test        # Test connection
-python scripts/run.py server      # Start server
-```
-
-#### Development Setup
-```bash
-make dev-setup                   # Complete development environment
-make setup-ssl                   # Smart SSL configuration (optional)
-make run-test                    # Test connection
-make run-server                  # Start server
-```
-
-#### Module Execution
-```bash
-python -m src.wazuh_mcp_server      # Start server
-python -m scripts.test_connection   # Test connection
-```
-
-### 🆘 Troubleshooting
-
-**Import Errors:**
-```bash
-make validate-env                # Check environment
-make fix-imports                 # Fix import issues
-```
-
-**SSL/Certificate Issues:**
-```bash
-make setup-ssl                   # Auto-configure SSL for your environment
-make check-ssl                   # Check SSL connectivity
-make fix-ssl                     # Fix common SSL issues
-```
-
-**Comprehensive Guides:**
-- [PRODUCTION_FIXES_GUIDE.md](PRODUCTION_FIXES_GUIDE.md) - Complete troubleshooting
-- [SSL_TROUBLESHOOTING_GUIDE.md](SSL_TROUBLESHOOTING_GUIDE.md) - SSL-specific issues
-
-## 🚀 Original Quick Start
-
-### Prerequisites
-
-- Python 3.8+ 
-- Wazuh 4.x deployment
-- Claude Desktop application
-
-### Installation
-
-```bash
-# Clone and enter directory
-git clone https://github.com/gensecaihq/wazuh-mcp-server.git
-cd wazuh-mcp-server
-
-# Run installer
-./scripts/install.sh  # or install.bat on Windows
-
-# Configure credentials
-cp .env.example .env
-nano .env  # Add your Wazuh credentials
-
-# Test connection
+# 4. Test connection (with automatic error recovery)
 python scripts/test_connection.py
+
+# 5. Start the server
+python src/wazuh_mcp_server.py --stdio
 ```
 
-### 🐳 Docker Installation
+### 🐳 Docker Deployment
 
 ```bash
+# Quick deployment with docker-compose
 docker-compose up -d
+```
+
+### 🔧 Claude Desktop Configuration
+
+Add to your Claude Desktop config (`~/Library/Application\ Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "wazuh-security": {
+      "command": "python",
+      "args": ["path/to/Wazuh-MCP-Server/src/wazuh_mcp_server.py", "--stdio"],
+      "env": {
+        "WAZUH_HOST": "your-wazuh-server",
+        "WAZUH_PORT": "55000",
+        "WAZUH_USER": "your-username",
+        "WAZUH_PASS": "your-password",
+        "VERIFY_SSL": "false"
+      }
+    }
+  }
+}
+```
+
+## 🏢 Production Deployment
+
+### 🔒 Security Configuration
+
+The server includes enterprise-grade security features:
+
+```python
+# Automatic SSL configuration
+SSL_VERIFY = "true"           # Enable for production certificates
+SSL_CA_BUNDLE = "/path/to/ca"   # Custom CA bundle
+SSL_CERT_PATH = "/path/to/cert" # Client certificate
+SSL_KEY_PATH = "/path/to/key"   # Client key
+```
+
+### 📊 Monitoring & Health Checks
+
+Built-in production monitoring:
+
+- **Health Endpoints**: Real-time system health monitoring
+- **Performance Metrics**: Request latency, error rates, connection stats
+- **Error Recovery Stats**: Circuit breaker status, retry attempts, fallback usage
+- **SSL Status**: Certificate validation and auto-detection results
+
+### 🔄 Error Recovery Features
+
+- **Intelligent Retry**: Exponential backoff with jitter for transient failures
+- **Circuit Breaker**: Prevents cascade failures during service outages
+- **Fallback Services**: Graceful degradation when primary services fail
+- **Emergency Mode**: Critical error handling for system stability
+
+## 📊 Available Tools & Resources
+
+### 🛠️ Core Security Tools
+
+| Tool | Description | Production Features |
+|------|-------------|-------------------|
+| `get_alerts` | Retrieve and analyze security alerts | Auto-retry, rate limiting |
+| `analyze_threats` | Advanced threat analysis with ML | Circuit breaker protection |
+| `risk_assessment` | Comprehensive security risk scoring | Fallback data sources |
+| `check_agent_health` | Agent monitoring and diagnostics | Health aggregation |
+| `compliance_check` | Framework compliance validation | Evidence collection |
+| `check_ioc` | IOC reputation and threat intel | Multi-source validation |
+
+### 📚 Real-time Resources
+
+- `wazuh://alerts/recent` - Live security alert feed with auto-refresh
+- `wazuh://agents/status` - Agent health dashboard with metrics
+- `wazuh://vulnerabilities/critical` - Critical vulnerability tracker
+- `wazuh://compliance/status` - Compliance posture monitoring
+- `wazuh://threats/active` - Active threat campaign tracking
+- `wazuh://system/health` - System health and performance metrics
+
+## 🔧 Configuration
+
+### Environment Variables
+
+```bash
+# Wazuh Server Configuration
+WAZUH_HOST=your-wazuh-server.domain.com
+WAZUH_PORT=55000
+WAZUH_USER=api-user
+WAZUH_PASS=secure-password
+
+# Wazuh Indexer (4.8+)
+WAZUH_INDEXER_HOST=your-indexer.domain.com
+WAZUH_INDEXER_PORT=9200
+WAZUH_INDEXER_USER=indexer-user
+WAZUH_INDEXER_PASS=indexer-password
+
+# SSL/TLS Configuration
+VERIFY_SSL=true
+SSL_CA_BUNDLE=/path/to/ca-bundle.pem
+SSL_CERT_PATH=/path/to/client.crt
+SSL_KEY_PATH=/path/to/client.key
+
+# Performance Tuning
+MAX_CONNECTIONS=50
+POOL_SIZE=10
+REQUEST_TIMEOUT=30
+MAX_ALERTS_PER_QUERY=1000
+
+# Logging & Monitoring
+LOG_LEVEL=INFO
+ENABLE_PERFORMANCE_LOGS=true
+ENABLE_ERROR_RECOVERY_STATS=true
+```
+
+## 🛠️ Development & Testing
+
+### Development Setup
+
+```bash
+# Create development environment
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+# or: venv\Scripts\activate  # Windows
+
+# Install with dev dependencies
+pip install -r requirements-dev.txt
+
+# Run tests
+python -m pytest tests/
+
+# Check code quality
+python -m flake8 src/
+```
+
+### Testing Error Recovery
+
+```bash
+# Test connection with error recovery
+python scripts/test_connection.py
+
+# Check SSL configuration
+python -c "from src.utils.ssl_config import SSLConfigurationManager; print('SSL OK')"
+
+# Test import resolution
+python -c "from src.utils.import_resolver import setup_imports; print('Imports OK')"
 ```
 
 ## 💡 Usage Examples
 
-Ask Claude questions like:
+### Security Operations
 
-- "Are there any signs of compromise on our web servers?"
-- "Generate a PCI DSS compliance report for our quarterly audit"
-- "Hunt for signs of lateral movement in our network"
-- "Check if IP 192.168.1.100 is malicious"
-- "Show me critical vulnerabilities being exploited"
+```python
+# Natural language security queries
+"Show me all failed login attempts in the last hour"
+"Are there any signs of ransomware activity?"
+"Check if our web servers are under attack"
+"Generate a security incident timeline for the last 24 hours"
+```
 
-## 🛣️ Roadmap
+### Compliance & Reporting
 
-### 🚀 What's Next?
+```python
+# Compliance assessments
+"Run a PCI DSS compliance check and show gaps"
+"Generate an executive security report"
+"Check our NIST framework compliance score"
+"Show evidence for SOC 2 audit requirements"
+```
 
-We're actively developing new features and would love your help! Here's what we're working on:
+### Threat Intelligence
 
-- [ ] **Advanced ML models** for threat prediction and behavioral analysis
-- [ ] **Custom detection rules** creation via natural language
-- [ ] **Automated response actions** for common security incidents
-- [ ] **Multi-tenant support** for MSSPs and large organizations
-- [ ] **Real-time threat intelligence** correlation with custom feeds
-- [ ] **GraphQL API** for advanced integrations
-- [ ] **Distributed architecture** for high-scale deployments
-- [ ] **SOAR platform integration** (Phantom, Demisto, etc.)
-- [ ] **Advanced forensics** capabilities with memory analysis
-- [ ] **Threat simulation** and purple team automation
-- [ ] **Custom dashboards** and visualization tools
-- [ ] **Mobile app** for on-the-go security monitoring
+```python
+# IOC analysis and threat hunting
+"Check if IP 192.168.1.100 is malicious"
+"Hunt for indicators of lateral movement"
+"Analyze this file hash: d41d8cd98f00b204e9800998ecf8427e"
+"Show active threat campaigns targeting our industry"
+```
 
-### 🤝 Want to Contribute?
+## 🚨 Troubleshooting
 
-Pick any item from the roadmap (or propose your own!) and start contributing. We provide mentorship for new contributors and have a welcoming community. Check our [Contributing Guide](#-contributing) to get started!
+### Common Issues
 
-## 👥 Contributing
+**Import Errors:**
+```bash
+# The server includes automatic import resolution
+# If issues persist, run:
+python -c "from src.utils.import_resolver import setup_imports; setup_imports(verify=True)"
+```
 
-We welcome contributions from the security community! Whether you're a security researcher, developer, or SOC analyst, there's a place for you here.
+**SSL/Certificate Issues:**
+```bash
+# Test SSL configuration
+python -c "
+from src.utils.ssl_config import SSLConfigurationManager
+manager = SSLConfigurationManager()
+print(manager.auto_detect_ssl_issues('your-host', 55000))
+"
+```
 
+**Connection Problems:**
+```bash
+# The server includes intelligent error recovery
+# Check logs for recovery attempts and fallback usage
+tail -f logs/wazuh_mcp_server.log
+```
 
-## Special Thanks ##
+## 🏗️ Architecture
 
-[@marcolinux46](https://github.com/marcolinux46) for their outstanding contributions to this project. Your deep involvement—from thorough testing and detailed log sharing to research and real-time feedback—enabled the rapid identification and resolution of several critical bugs.
+### Core Components
+
+- **Error Recovery Engine**: Intelligent failure handling with multiple recovery strategies
+- **SSL Configuration Manager**: Production-grade certificate and TLS handling
+- **Import Resolver**: Cross-platform import path resolution
+- **API Client Manager**: High-performance async clients with connection pooling
+- **Security Analyzer**: Advanced threat detection and risk assessment
+- **Compliance Engine**: Multi-framework compliance checking
+
+### Production Features
+
+- **Circuit Breaker Pattern**: Prevents cascade failures
+- **Exponential Backoff**: Smart retry mechanisms with jitter
+- **Health Monitoring**: Comprehensive system health checks
+- **Performance Metrics**: Real-time operational statistics
+- **Graceful Degradation**: Fallback services for high availability
+
+## 📈 Monitoring & Observability
+
+The server provides comprehensive monitoring capabilities:
+
+```python
+# Health check endpoint
+GET /health
+{
+  "status": "healthy",
+  "components": {
+    "wazuh_server": "healthy",
+    "wazuh_indexer": "healthy",
+    "error_recovery": "active"
+  },
+  "metrics": {
+    "total_requests": 1542,
+    "error_rate": 0.02,
+    "avg_response_time": 145.3
+  }
+}
+
+# Error recovery statistics
+GET /stats/recovery
+{
+  "circuit_breakers": {
+    "wazuh_server_get": "closed",
+    "wazuh_indexer_search": "closed"
+  },
+  "fallback_usage": {
+    "get_alerts": 3,
+    "health_check": 1
+  }
+}
+```
+
+## 🤝 Contributing
+
+We welcome contributions from the security community! The codebase is designed for easy extension and modification.
 
 ### 🎯 How You Can Help
 
-- **🔍 Security Researchers**: Contribute new threat detection algorithms or analysis techniques
-- **💻 Developers**: Add new integrations, improve performance, or enhance the codebase
-- **🛡️ SOC Analysts**: Share real-world use cases and help improve workflows
-- **📚 Technical Writers**: Improve documentation and create tutorials
-- **🧪 Testers**: Help us find bugs and improve reliability
-- **🎨 UX Enthusiasts**: Suggest improvements for better user experience
+- **🔍 Security Researchers**: Contribute new threat detection algorithms
+- **💻 Developers**: Add integrations, improve performance, enhance reliability
+- **🛡️ SOC Analysts**: Share real-world use cases and workflows
+- **📚 Technical Writers**: Improve documentation and tutorials
 
 ### 🚀 Getting Started
 
-1. **Fork** the repository
-2. **Pick an issue** labeled `good first issue` or `help wanted`
-3. **Create** your feature branch (`git checkout -b feature/AmazingFeature`)
-4. **Commit** your changes (`git commit -m 'Add some AmazingFeature'`)
-5. **Push** to the branch (`git push origin feature/AmazingFeature`)
-6. **Open** a Pull Request
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Make your changes with tests
+4. Ensure all tests pass (`python -m pytest`)
+5. Commit your changes (`git commit -m 'Add AmazingFeature'`)
+6. Push to the branch (`git push origin feature/AmazingFeature`)
+7. Open a Pull Request
 
-### 💡 Contribution Ideas
+### 🛠️ Development Guidelines
 
-- Implement a new threat intelligence source integration
-- Add support for your favorite compliance framework
-- Create custom analysis algorithms for specific attack patterns
-- Improve error handling and logging
-- Add more natural language query examples
-- Create video tutorials or blog posts
-- Translate documentation to other languages
-
-### 🛠️ Development Setup
-
-```bash
-# Clone your fork
-git clone https://github.com/gensecaihq/wazuh-mcp-server.git
-cd wazuh-mcp-server
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-
-# Install in development mode
-pip install -e ".[dev]"
-
-# Run tests
-pytest
-
-```
-
-**First time contributing to open source?** No problem! We'll help you through the process. Just open an issue saying you'd like to help, and we'll find something perfect for your skill level.
-
-Your dedication, technical insight, and willingness to dive deep into the issues have significantly improved the stability and reliability of the project. We truly appreciate your time, collaboration, and continued support. Thank you!
-
-## 📚 Documentation
-
-- [Installation Guide](docs/installation.md)
-- [Configuration Reference](docs/configuration.md)
-- [Usage Examples](docs/usage.md)
-- [API Reference](docs/api_reference.md)
-
-## 💬 Community
-
-- [Discussions](https://github.com/gensecaihq/Wazuh-MCP-Server/discussions/)
-- [Issue Tracker](https://github.com/gensecaihq/wazuh-mcp-server/issues)
-
+- Follow PEP 8 style guidelines
+- Add tests for new features
+- Update documentation for API changes
+- Use type hints for better code clarity
+- Include error handling and logging
 
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+## 🙏 Acknowledgments
+
+### Special Thanks
+
+**[@marcolinux46](https://github.com/marcolinux46)** for outstanding contributions including thorough testing, detailed log sharing, research, and real-time feedback that enabled rapid identification and resolution of critical production issues.
+
+**Security Community** for continuous feedback and real-world testing that drives our production-grade improvements.
+
 ---
 
 <div align="center">
 
-**Built with ❤️ in Kolkata and Globally**
+**Built with ❤️ for Production Security Operations**
 
-*"Making security operations as natural as having a conversation"*
+*"Making enterprise security as natural as having a conversation"*
+
+[![GitHub stars](https://img.shields.io/github/stars/gensecaihq/Wazuh-MCP-Server?style=social)](https://github.com/gensecaihq/Wazuh-MCP-Server/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/gensecaihq/Wazuh-MCP-Server?style=social)](https://github.com/gensecaihq/Wazuh-MCP-Server/network/members)
 
 </div>
