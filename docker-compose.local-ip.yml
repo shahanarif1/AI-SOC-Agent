@@ -1,5 +1,8 @@
 version: '3.8'
 
+# Wazuh MCP Server - IP/Port-Based Deployment
+# For private networks, LANs, and environments without FQDN requirements
+
 services:
   # Wazuh MCP Server - HTTP Transport
   wazuh-mcp-http:
@@ -22,30 +25,36 @@ services:
       WAZUH_INDEXER_USER: ${WAZUH_INDEXER_USER}
       WAZUH_INDEXER_PASS: ${WAZUH_INDEXER_PASS}
       
+      # Authentication & Security
+      JWT_SECRET: ${JWT_SECRET:-default-dev-secret-change-in-production}
+      API_KEYS: ${API_KEYS:-dev-key:developer:user,admin-key:admin:admin}
+      ENABLE_AUTH: ${ENABLE_AUTH:-true}
+      
       # Server Configuration
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DEBUG: ${DEBUG:-false}
+      
+      # Rate Limiting
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-100}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-60}
       
       # External API Keys (optional)
       VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY}
       SHODAN_API_KEY: ${SHODAN_API_KEY}
       ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY}
     ports:
-      - "8000:8000"
+      - "${HTTP_PORT:-8000}:8000"
     command: ["python", "wazuh_mcp_server.py", "--http", "--host", "0.0.0.0", "--port", "8000"]
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
     networks:
       - wazuh-mcp-network
-    depends_on:
-      - traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.wazuh-mcp-http.rule=Host(`mcp-http.${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.wazuh-mcp-http.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
-      - "traefik.http.routers.wazuh-mcp-http.tls.certresolver=${TLS_RESOLVER:-letsencrypt}"
-      - "traefik.http.services.wazuh-mcp-http.loadbalancer.server.port=8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Wazuh MCP Server - WebSocket Transport
   wazuh-mcp-ws:
@@ -68,65 +77,76 @@ services:
       WAZUH_INDEXER_USER: ${WAZUH_INDEXER_USER}
       WAZUH_INDEXER_PASS: ${WAZUH_INDEXER_PASS}
       
+      # Authentication & Security
+      JWT_SECRET: ${JWT_SECRET:-default-dev-secret-change-in-production}
+      API_KEYS: ${API_KEYS:-dev-key:developer:user,admin-key:admin:admin}
+      ENABLE_AUTH: ${ENABLE_AUTH:-true}
+      
       # Server Configuration
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DEBUG: ${DEBUG:-false}
+      
+      # Rate Limiting
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-100}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-60}
       
       # External API Keys (optional)
       VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY}
       SHODAN_API_KEY: ${SHODAN_API_KEY}
       ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY}
     ports:
-      - "8001:8001"
+      - "${WS_PORT:-8001}:8001"
     command: ["python", "wazuh_mcp_server.py", "--ws", "--host", "0.0.0.0", "--port", "8001"]
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
     networks:
       - wazuh-mcp-network
-    depends_on:
-      - traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.wazuh-mcp-ws.rule=Host(`mcp-ws.${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.wazuh-mcp-ws.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
-      - "traefik.http.routers.wazuh-mcp-ws.tls.certresolver=${TLS_RESOLVER:-letsencrypt}"
-      - "traefik.http.services.wazuh-mcp-ws.loadbalancer.server.port=8001"
+    healthcheck:
+      test: ["CMD", "timeout", "5", "bash", "-c", "echo > /dev/tcp/localhost/8001"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Reverse Proxy with SSL Termination
-  traefik:
+  # Optional: Reverse Proxy for HTTP-only (no SSL)
+  traefik-http:
     image: traefik:v3.0
-    container_name: wazuh-mcp-traefik
+    container_name: wazuh-mcp-traefik-http
     restart: unless-stopped
     command:
       - "--api.dashboard=true"
-      - "--api.debug=true"
-      - "--log.level=INFO"
+      - "--api.debug=${TRAEFIK_DEBUG:-false}"
+      - "--log.level=${TRAEFIK_LOG_LEVEL:-INFO}"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}"
-      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.traefik.address=:8080"
       - "--global.checkNewVersion=false"
       - "--global.sendAnonymousUsage=false"
     ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080"  # Traefik dashboard
+      - "${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_DASHBOARD_PORT:-8080}:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "./letsencrypt:/letsencrypt"
     networks:
       - wazuh-mcp-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.traefik.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
-      - "traefik.http.routers.traefik.tls.certresolver=${TLS_RESOLVER:-letsencrypt}"
-      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=traefik"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+      # HTTP API routing
+      - "traefik.http.routers.wazuh-mcp-http.rule=PathPrefix(`/api`) || PathPrefix(`/tools`) || PathPrefix(`/health`) || PathPrefix(`/auth`)"
+      - "traefik.http.routers.wazuh-mcp-http.entrypoints=web"
+      - "traefik.http.routers.wazuh-mcp-http.service=wazuh-mcp-http"
+      - "traefik.http.services.wazuh-mcp-http.loadbalancer.server.url=http://wazuh-mcp-http:8000"
+      # WebSocket routing  
+      - "traefik.http.routers.wazuh-mcp-ws.rule=PathPrefix(`/ws`)"
+      - "traefik.http.routers.wazuh-mcp-ws.entrypoints=web"
+      - "traefik.http.routers.wazuh-mcp-ws.service=wazuh-mcp-ws"
+      - "traefik.http.services.wazuh-mcp-ws.loadbalancer.server.url=http://wazuh-mcp-ws:8001"
+    profiles:
+      - "proxy"
 
   # Redis for session management and rate limiting
   redis:
@@ -139,7 +159,9 @@ services:
     networks:
       - wazuh-mcp-network
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
+    profiles:
+      - "storage"
 
   # Monitoring with Prometheus
   prometheus:
@@ -153,18 +175,16 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
+      - '--web.listen-address=0.0.0.0:9090'
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     networks:
       - wazuh-mcp-network
     ports:
-      - "9090:9090"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.prometheus.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
-      - "traefik.http.routers.prometheus.tls.certresolver=${TLS_RESOLVER:-letsencrypt}"
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    profiles:
+      - "monitoring"
 
   # Grafana for monitoring dashboards
   grafana:
@@ -174,22 +194,24 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_SERVER_HTTP_ADDR: 0.0.0.0
+      GF_SERVER_HTTP_PORT: 3000
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
     networks:
       - wazuh-mcp-network
     ports:
-      - "3000:3000"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.grafana.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}"
-      - "traefik.http.routers.grafana.tls.certresolver=${TLS_RESOLVER:-letsencrypt}"
+      - "${GRAFANA_PORT:-3000}:3000"
+    profiles:
+      - "monitoring"
 
 networks:
   wazuh-mcp-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: ${NETWORK_SUBNET:-172.20.0.0/24}
 
 volumes:
   redis-data:

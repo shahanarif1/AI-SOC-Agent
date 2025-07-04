@@ -19,9 +19,11 @@ The remote setup provides:
 
 - **Docker**: Version 20.10+ with Docker Compose v2
 - **Server**: Linux server with minimum 2GB RAM, 1 CPU core, 10GB storage
-- **Network**: Public IP address with ports 80/443 accessible
-- **Domain**: Registered domain name pointing to your server
-- **DNS**: Ability to configure DNS A records
+- **Network**: Public IP address with ports 80/443 accessible (FQDN mode) OR any IP address with custom ports (IP mode)
+- **Domain**: Registered domain name pointing to your server (FQDN mode only)
+- **DNS**: Ability to configure DNS A records (FQDN mode only)
+
+> **Note**: For private networks, internal LANs, or environments without domain names, see the [IP/Port Deployment Guide](IP_PORT_DEPLOYMENT.md).
 
 ### Wazuh Environment
 

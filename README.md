@@ -103,7 +103,7 @@ Choose your deployment option based on your needs:
 
 **Production Deployments:**
 - Docker and Docker Compose
-- Domain name (for SSL certificates)
+- Domain name (for SSL certificates) OR static IP address (for private networks)
 - 2GB+ RAM, 1+ CPU cores
 
 ### Local Setup (Claude Desktop Integration)
@@ -193,7 +193,15 @@ After restarting Claude Desktop, you can ask questions like:
 - "Check the compliance status for PCI DSS"
 - "Analyze recent authentication failures"
 
-### Option 2: Production Setup (Teams & Remote Access)
+### Production Setup (Teams & Remote Access)
+
+Choose your deployment method based on your infrastructure:
+
+#### Option A: Domain-based (Public Access with SSL)
+For organizations with public domains and need for SSL certificates.
+
+#### Option B: IP-based (Private Networks)
+For internal LANs, private clouds, and environments without domain names.
 
 #### 🖥️ Windows
 ```powershell
@@ -205,10 +213,12 @@ deploy.bat deploy
 ```
 
 #### 🍎 macOS / 🐧 Linux
+
+**Domain-based deployment:**
 ```bash
-# 1. Prepare environment
+# 1. Prepare environment  
 cp .env.production.example .env.production
-# Edit .env.production with your configuration
+# Edit .env.production with your domain and configuration
 
 # 2. Deploy
 ./deploy.sh deploy
@@ -216,6 +226,20 @@ cp .env.production.example .env.production
 # 3. Access
 # HTTP: https://mcp-http.your-domain.com
 # WebSocket: wss://mcp-ws.your-domain.com
+```
+
+**IP-based deployment:**
+```bash
+# 1. Prepare environment
+cp .env.local-ip.example .env.local-ip
+# Edit .env.local-ip with your IP and configuration
+
+# 2. Deploy  
+./deploy-local-ip.sh deploy
+
+# 3. Access
+# HTTP: http://192.168.1.50:8000
+# WebSocket: ws://192.168.1.50:8001
 ```
 
 ## 🖥️ Local Setup (Claude Desktop)

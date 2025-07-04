@@ -34,28 +34,33 @@ python wazuh_mcp_server.py --stdio
 
 **Setup Time:** ~15 minutes  
 **Complexity:** Medium  
-**Infrastructure:** Docker, domain name
+**Infrastructure:** Docker, domain name (FQDN) OR IP address (IP mode)
 
 ```bash
-# Production deployment
+# FQDN-based deployment (with SSL)
 ./deploy.sh deploy
+
+# IP-based deployment (private networks)
+./deploy-local-ip.sh deploy
 ```
 
 ## 📊 Feature Comparison
 
-| Feature | Local Mode | Production Mode |
-|---------|------------|-----------------|
-| **Setup Complexity** | Simple | Medium |
-| **Claude Desktop Integration** | ✅ Native | ✅ Via HTTP/WS |
-| **Multiple Users** | ❌ Single user | ✅ Multi-user |
-| **Authentication** | Environment variables | JWT + API keys |
-| **Monitoring** | Basic logs | Prometheus + Grafana |
-| **SSL/TLS** | Optional | Automatic (Let's Encrypt) |
-| **Rate Limiting** | None | Configurable |
-| **High Availability** | ❌ | ✅ Load balanced |
-| **External API Access** | ❌ | ✅ HTTP/WebSocket |
-| **Resource Usage** | Low | Medium-High |
-| **Production Ready** | Development | ✅ Enterprise |
+| Feature | Local Mode | Production (FQDN) | Production (IP/Port) |
+|---------|------------|-------------------|---------------------|
+| **Setup Complexity** | Simple | Medium | Medium-Low |
+| **Claude Desktop Integration** | ✅ Native | ✅ Via HTTP/WS | ✅ Via HTTP/WS |
+| **Multiple Users** | ❌ Single user | ✅ Multi-user | ✅ Multi-user |
+| **Authentication** | Environment variables | JWT + API keys | JWT + API keys |
+| **Monitoring** | Basic logs | Prometheus + Grafana | Prometheus + Grafana |
+| **SSL/TLS** | Optional | ✅ Automatic (Let's Encrypt) | Optional (self-signed) |
+| **Rate Limiting** | None | Configurable | Configurable |
+| **High Availability** | ❌ | ✅ Load balanced | ✅ Load balanced |
+| **External API Access** | ❌ | ✅ HTTP/WebSocket | ✅ HTTP/WebSocket |
+| **Domain Requirements** | ❌ None | ✅ FQDN required | ❌ IP address only |
+| **Private Network** | ✅ Local only | ❌ Public domain needed | ✅ LAN/VPN friendly |
+| **Resource Usage** | Low | Medium-High | Medium |
+| **Production Ready** | Development | ✅ Enterprise | ✅ Enterprise |
 
 ## 🛠️ Technical Requirements
 
@@ -66,10 +71,19 @@ python wazuh_mcp_server.py --stdio
 - ~100MB RAM, minimal CPU
 
 ### Production Mode Requirements
+
+#### FQDN-Based (Traditional)
 - Docker & Docker Compose
 - Domain name (for SSL certificates)
 - 2GB+ RAM, 1+ CPU cores
 - Ports 80, 443 open (for SSL)
+- Network access to Wazuh server
+
+#### IP/Port-Based (Private Networks)
+- Docker & Docker Compose
+- Static IP address (public or private)
+- 1GB+ RAM, 1+ CPU cores
+- Custom ports open (default: 8000, 8001)
 - Network access to Wazuh server
 
 ## 🚀 Quick Start by Use Case
@@ -86,13 +100,25 @@ cp .env.example .env
 ```
 
 ### 🏢 **Security Team (Organization)**
+
+#### Option A: FQDN-Based (Public Access)
 ```bash
-# Production deployment for team access
+# Production deployment for team access with domain
 git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
 cd Wazuh-MCP-Server
 cp .env.production.example .env.production
-# Edit .env.production with your configuration
+# Edit .env.production with your domain and configuration
 ./deploy.sh deploy
+```
+
+#### Option B: IP-Based (Private Network)
+```bash
+# Production deployment for team access with IP
+git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
+cd Wazuh-MCP-Server
+cp .env.local-ip.example .env.local-ip
+# Edit .env.local-ip with your IP and configuration
+./deploy-local-ip.sh deploy
 ```
 
 ### 🧑‍💻 **Developer (Testing)**
