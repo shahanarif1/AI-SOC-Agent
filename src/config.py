@@ -165,6 +165,13 @@ class WazuhConfig(BaseModel):
         """Get the base URL for Wazuh API."""
         return f"https://{self.host}:{self.port}"
     
+    @staticmethod
+    def _parse_bool(value: Optional[str]) -> bool:
+        """Parse boolean from string with consistent handling."""
+        if value is None:
+            return False
+        return value.lower() in ("true", "yes", "1", "on")
+    
     @classmethod
     def from_env(cls) -> 'WazuhConfig':
         """Create configuration from environment variables."""
@@ -175,9 +182,9 @@ class WazuhConfig(BaseModel):
             indexer_password = os.getenv("WAZUH_INDEXER_PASS") or os.getenv("WAZUH_PASS")
             indexer_verify_ssl = os.getenv("WAZUH_INDEXER_VERIFY_SSL")
             if indexer_verify_ssl is None:
-                indexer_verify_ssl = os.getenv("VERIFY_SSL", "true").lower() == "true"
+                indexer_verify_ssl = cls._parse_bool(os.getenv("VERIFY_SSL", "false"))
             else:
-                indexer_verify_ssl = indexer_verify_ssl.lower() == "true"
+                indexer_verify_ssl = cls._parse_bool(indexer_verify_ssl)
             
             return cls(
                 # Server API settings
@@ -185,7 +192,7 @@ class WazuhConfig(BaseModel):
                 port=int(os.getenv("WAZUH_PORT", "55000")),
                 username=os.getenv("WAZUH_USER"),
                 password=os.getenv("WAZUH_PASS"),
-                verify_ssl=os.getenv("VERIFY_SSL", "true").lower() == "true",
+                verify_ssl=cls._parse_bool(os.getenv("VERIFY_SSL", "false")),
                 api_version=os.getenv("WAZUH_API_VERSION", "v4"),
                 
                 # Indexer API settings
@@ -197,8 +204,8 @@ class WazuhConfig(BaseModel):
                 
                 # Version and feature flags
                 wazuh_version=os.getenv("WAZUH_VERSION"),
-                use_indexer_for_alerts=os.getenv("USE_INDEXER_FOR_ALERTS", "true").lower() == "true",
-                use_indexer_for_vulnerabilities=os.getenv("USE_INDEXER_FOR_VULNERABILITIES", "true").lower() == "true",
+                use_indexer_for_alerts=cls._parse_bool(os.getenv("USE_INDEXER_FOR_ALERTS", "true")),
+                use_indexer_for_vulnerabilities=cls._parse_bool(os.getenv("USE_INDEXER_FOR_VULNERABILITIES", "true")),
                 
                 # External APIs
                 virustotal_api_key=os.getenv("VIRUSTOTAL_API_KEY"),
@@ -214,9 +221,9 @@ class WazuhConfig(BaseModel):
                 pool_size=int(os.getenv("POOL_SIZE", "5")),
                 
                 # Feature flags
-                enable_external_intel=os.getenv("ENABLE_EXTERNAL_INTEL", "true").lower() == "true",
-                enable_ml_analysis=os.getenv("ENABLE_ML_ANALYSIS", "true").lower() == "true",
-                enable_compliance_checking=os.getenv("ENABLE_COMPLIANCE_CHECKING", "true").lower() == "true",
+                enable_external_intel=cls._parse_bool(os.getenv("ENABLE_EXTERNAL_INTEL", "true")),
+                enable_ml_analysis=cls._parse_bool(os.getenv("ENABLE_ML_ANALYSIS", "true")),
+                enable_compliance_checking=cls._parse_bool(os.getenv("ENABLE_COMPLIANCE_CHECKING", "true")),
                 enable_experimental=os.getenv("ENABLE_EXPERIMENTAL", "false").lower() == "true",
                 
 

@@ -50,7 +50,7 @@ try:
     from utils import (
         setup_logging, get_logger, LogContext,
         validate_alert_query, validate_agent_query, validate_threat_analysis,
-        validate_ip_address, ValidationError,
+        validate_ip_address, validate_file_hash, ValidationError,
         WazuhMCPError, ConfigurationError, APIError
     )
 except ImportError as e:
@@ -89,12 +89,29 @@ class WazuhMCPServer:
         self.api_client = WazuhClientManager(self.config)
         self.security_analyzer = SecurityAnalyzer()
         self.compliance_analyzer = ComplianceAnalyzer()
-        self.cortex_client = None
         
         # Setup handlers
         self._setup_handlers()
         
         self.logger.info("Wazuh MCP Server initialized successfully")
+    
+    def _format_error_response(self, error: Exception, request_id: str = None, 
+                               execution_time: float = None) -> str:
+        """Format error response consistently."""
+        error_data = {
+            "error": str(error),
+            "error_type": type(error).__name__
+        }
+        
+        if request_id:
+            error_data["request_id"] = request_id
+        
+        if execution_time is not None:
+            error_data["execution_time"] = round(execution_time, 2)
+        
+        error_data["timestamp"] = datetime.utcnow().isoformat()
+        
+        return json.dumps(error_data, indent=2)
     
     async def initialize_connections(self):
         """Initialize connections and detect Wazuh version."""
@@ -105,7 +122,6 @@ class WazuhMCPServer:
                     self.logger.info(f"Connected to Wazuh {version}")
                 else:
                     self.logger.warning("Could not detect Wazuh version")
-            # Cortex client initialization removed
         except Exception as e:
             self.logger.error(f"Failed to initialize connections: {str(e)}")
     
@@ -208,7 +224,7 @@ class WazuhMCPServer:
                         
             except Exception as e:
                 self.logger.error(f"Error reading resource {uri}: {str(e)}")
-                return json.dumps({"error": str(e), "request_id": request_id})
+                return self._format_error_response(e, request_id)
         
         @self.server.list_tools()
         async def handle_list_tools() -> list[types.Tool]:
@@ -485,28 +501,24 @@ class WazuhMCPServer:
                 self.logger.error(f"Tool {name} timed out after {execution_time:.2f}s")
                 return [types.TextContent(
                     type="text",
-                    text=json.dumps({
-                        "error": f"Tool execution timed out after {execution_time:.2f} seconds",
-                        "request_id": request_id,
-                        "timeout": timeout
-                    })
+                    text=self._format_error_response(
+                        asyncio.TimeoutError(f"Tool execution timed out after {timeout} seconds"),
+                        request_id,
+                        execution_time
+                    )
                 )]
             except ValidationError as e:
                 self.logger.warning(f"Validation error in tool {name}: {str(e)}")
                 return [types.TextContent(
                     type="text",
-                    text=json.dumps({"error": f"Validation error: {str(e)}", "request_id": request_id})
+                    text=self._format_error_response(e, request_id)
                 )]
             except Exception as e:
                 execution_time = (datetime.utcnow() - start_time).total_seconds()
                 self.logger.error(f"Error executing tool {name} after {execution_time:.2f}s: {str(e)}")
                 return [types.TextContent(
                     type="text",
-                    text=json.dumps({
-                        "error": str(e), 
-                        "request_id": request_id,
-                        "execution_time": execution_time
-                    })
+                    text=self._format_error_response(e, request_id, execution_time)
                 )]
     
     async def _handle_get_alerts(self, arguments: dict) -> list[types.TextContent]:
@@ -593,7 +605,7 @@ class WazuhMCPServer:
             if not agent:
                 return [types.TextContent(
                     type="text",
-                    text=json.dumps({"error": f"Agent ID {agent_id} not found."})
+                    text=self._format_error_response(ValueError(f"Agent ID {agent_id} not found"))
                 )]
             
             health = self._assess_agent_health(agent)
@@ -715,7 +727,6 @@ class WazuhMCPServer:
         
         if file_hash:
             try:
-                from utils.validation import validate_file_hash
                 validated_hash = validate_file_hash(file_hash)
                 results["indicators"].append({
                     "type": "file_hash",
@@ -805,7 +816,7 @@ class WazuhMCPServer:
         agent_id = arguments.get("agent_id")
         validated_query = validate_agent_query({"agent_id": agent_id})
 
-        data = await self.api_client.server_client.get_agent_processes(validated_query.agent_id)
+        data = await self.api_client.get_agent_processes(validated_query.agent_id)
 
         return [types.TextContent(
             type="text",
@@ -817,7 +828,7 @@ class WazuhMCPServer:
         agent_id = arguments.get("agent_id")
         validated_query = validate_agent_query({"agent_id": agent_id})
 
-        data = await self.api_client.server_client.get_agent_ports(validated_query.agent_id)
+        data = await self.api_client.get_agent_ports(validated_query.agent_id)
 
         return [types.TextContent(
             type="text",
@@ -830,7 +841,7 @@ class WazuhMCPServer:
         stat_type = arguments.get("stat_type")
         agent_id = arguments.get("agent_id")
 
-        data = await self.api_client.server_client.get_wazuh_stats(component, stat_type, agent_id)
+        data = await self.api_client.get_wazuh_stats(component, stat_type, agent_id)
 
         return [types.TextContent(
             type="text",
@@ -843,8 +854,21 @@ class WazuhMCPServer:
         query = arguments.get("query")
         limit = arguments.get("limit", 100)
         agent_id = arguments.get("agent_id")
+        
+        # Validate required parameters
+        if not log_source:
+            return [types.TextContent(
+                type="text",
+                text=self._format_error_response(ValueError("log_source is required"))
+            )]
+        
+        if not query:
+            return [types.TextContent(
+                type="text",
+                text=self._format_error_response(ValueError("query is required"))
+            )]
 
-        data = await self.api_client.server_client.search_wazuh_logs(log_source, query, limit, agent_id)
+        data = await self.api_client.search_wazuh_logs(log_source, query, limit, agent_id)
 
         return [types.TextContent(
             type="text",
@@ -853,8 +877,8 @@ class WazuhMCPServer:
 
     async def _handle_get_cluster_health(self, arguments: dict) -> list[types.TextContent]:
         """Handle get_cluster_health tool execution."""
-        data = await self.api_client.server_client.get_cluster_info()
-        nodes_data = await self.api_client.server_client.get_cluster_nodes()
+        data = await self.api_client.get_cluster_info()
+        nodes_data = await self.api_client.get_cluster_nodes()
 
         # Combine cluster info and node info
         cluster_health = {
@@ -1164,8 +1188,8 @@ class WazuhMCPServer:
         finally:
             self.logger.info("Shutting down Wazuh MCP Server...")
             try:
-                await self.api_client.__aexit__(None, None, None)
-                # Cortex client cleanup removed
+                if api_client_entered:
+                    await self.api_client.__aexit__(None, None, None)
             except Exception as e:
                 self.logger.error(f"Error during cleanup: {str(e)}")
             self.logger.info("Server shutdown completed")

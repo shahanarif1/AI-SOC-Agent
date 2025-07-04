@@ -42,10 +42,23 @@ class WazuhIndexerClient:
         
         # Initialize field mapper for schema compatibility
         wazuh_version = getattr(config, 'wazuh_version', None)
-        if wazuh_version and wazuh_version.startswith('4.8'):
-            self.field_mapper = WazuhFieldMapper(WazuhVersion.V4_8_X)
-        elif wazuh_version and wazuh_version.startswith('4.9'):
-            self.field_mapper = WazuhFieldMapper(WazuhVersion.V4_9_X)
+        if wazuh_version:
+            # Extract major.minor version
+            import re
+            version_match = re.search(r'(\d+)\.(\d+)', wazuh_version)
+            if version_match:
+                major = int(version_match.group(1))
+                minor = int(version_match.group(2))
+                
+                if major == 4 and minor == 8:
+                    self.field_mapper = WazuhFieldMapper(WazuhVersion.V4_8_X)
+                elif major == 4 and minor >= 9:
+                    self.field_mapper = WazuhFieldMapper(WazuhVersion.V4_9_X)
+                else:
+                    # For older or newer versions, default to 4.8.x
+                    self.field_mapper = WazuhFieldMapper(WazuhVersion.V4_8_X)
+            else:
+                self.field_mapper = WazuhFieldMapper(WazuhVersion.V4_8_X)
         else:
             self.field_mapper = WazuhFieldMapper(WazuhVersion.V4_8_X)  # Default to 4.8.x
         
@@ -447,7 +460,9 @@ class WazuhIndexerClient:
             "details": {"agent_id": agent_id, "cve_id": cve_id, "limit": limit}
         })
         
-        result = await self._request("POST", "/wazuh-states-vulnerabilities*/_search", data=query)
+        # Use field mapper to get proper index pattern
+        vuln_index = self.field_mapper.get_index_pattern("vulnerabilities")
+        result = await self._request("POST", f"/{vuln_index}/_search", data=query)
         
         # Transform to match Server API format
         return self._transform_vulnerabilities_response(result)

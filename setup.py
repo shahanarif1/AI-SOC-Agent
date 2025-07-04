@@ -20,6 +20,9 @@ setup(
         "python-dateutil>=2.8.2",
         "python-dotenv>=1.0.0",
         "pydantic>=2.0.0",
+        "packaging>=21.0",
+        "psutil>=5.9.0",
+        "certifi>=2023.5.7",
     ],
     extras_require={
         "dev": [

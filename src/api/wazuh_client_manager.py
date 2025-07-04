@@ -191,9 +191,29 @@ class WazuhClientManager:
         """Get agent stats from Server API."""
         return await self.server_client.get_agent_stats(agent_id)
     
+    async def get_agent_processes(self, agent_id: str) -> Dict[str, Any]:
+        """Get agent processes from Server API."""
+        return await self.server_client.get_agent_processes(agent_id)
+    
+    async def get_agent_ports(self, agent_id: str) -> Dict[str, Any]:
+        """Get agent ports from Server API."""
+        return await self.server_client.get_agent_ports(agent_id)
+    
+    async def get_wazuh_stats(self, component: str, stat_type: str, agent_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get Wazuh statistics from Server API."""
+        return await self.server_client.get_wazuh_stats(component, stat_type, agent_id)
+    
+    async def search_wazuh_logs(self, log_source: str, query: str, limit: int = 100, agent_id: Optional[str] = None) -> Dict[str, Any]:
+        """Search Wazuh logs from Server API."""
+        return await self.server_client.search_wazuh_logs(log_source, query, limit, agent_id)
+    
     async def get_cluster_info(self) -> Dict[str, Any]:
         """Get cluster info from Server API."""
         return await self.server_client.get_cluster_info()
+    
+    async def get_cluster_nodes(self) -> Dict[str, Any]:
+        """Get cluster nodes from Server API."""
+        return await self.server_client.get_cluster_nodes()
     
     async def restart_agent(self, agent_id: str) -> Dict[str, Any]:
         """Restart agent via Server API."""

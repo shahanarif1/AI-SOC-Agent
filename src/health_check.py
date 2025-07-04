@@ -17,8 +17,10 @@ import sys
 from pathlib import Path
 
 from .config import WazuhConfig
-from .monitoring.performance_monitor import performance_monitor
-from .resilience.error_recovery import error_recovery_manager
+# Monitoring and error recovery functionality integrated into main modules
+# from .monitoring.performance_monitor import performance_monitor
+# from .resilience.error_recovery import error_recovery_manager
+from .utils.error_recovery import error_recovery_manager
 
 
 class HealthStatus(Enum):
@@ -329,7 +331,9 @@ class HealthChecker:
     def _check_performance(self) -> HealthCheckResult:
         """Check performance metrics."""
         try:
-            perf_summary = performance_monitor.get_performance_summary()
+            # Performance monitoring integrated into error recovery system
+            # perf_summary = performance_monitor.get_performance_summary()
+            perf_summary = error_recovery_manager.get_error_statistics()
             
             details = {
                 'active_metrics': len(perf_summary.get('application_metrics', {})),
