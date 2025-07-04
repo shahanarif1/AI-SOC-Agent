@@ -6,7 +6,7 @@ import tempfile
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta
 
-from src.config import WazuhConfig
+from wazuh_mcp_server.config import WazuhConfig
 
 
 @pytest.fixture
@@ -207,7 +207,7 @@ def mock_datetime():
     """Mock datetime for consistent testing."""
     fixed_datetime = datetime(2023, 12, 1, 10, 0, 0)
     
-    with patch('src.analyzers.security_analyzer.datetime') as mock_dt:
+    with patch('wazuh_mcp_server.analyzers.security_analyzer.datetime') as mock_dt:
         mock_dt.utcnow.return_value = fixed_datetime
         mock_dt.fromisoformat = datetime.fromisoformat
         mock_dt.return_value = fixed_datetime

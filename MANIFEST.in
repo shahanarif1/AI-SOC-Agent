@@ -1,0 +1,74 @@
+# Wazuh MCP Server - Distribution Manifest
+# Controls what files are included in production distributions
+
+# Include essential files
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include requirements.txt
+include pyproject.toml
+include wazuh_mcp_server.py
+include setup.py
+
+# Include configuration templates
+include .env.example
+include .env.production.example
+include docker-compose.yml
+include Dockerfile
+
+# Include deployment scripts
+include deploy.sh
+include deploy.bat
+include deploy.ps1
+
+# Include documentation
+recursive-include docs *.md
+
+# Include scripts
+recursive-include scripts *.sh
+
+# Include monitoring configuration
+recursive-include monitoring *.yml *.yaml
+
+# Include source code
+recursive-include src/wazuh_mcp_server *.py
+
+# Exclude development files
+exclude .env
+exclude .env.local
+exclude .env.test
+exclude requirements-dev.txt
+
+# Exclude test files from production distributions
+recursive-exclude tests *
+exclude tests
+
+# Exclude development artifacts
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * *.so
+exclude .coverage
+exclude .pytest_cache
+recursive-exclude htmlcov *
+
+# Exclude IDE files
+recursive-exclude * .idea
+recursive-exclude * .vscode
+recursive-exclude * *.swp
+recursive-exclude * *.swo
+
+# Exclude OS files
+exclude .DS_Store
+exclude Thumbs.db
+
+# Exclude Docker volumes and data
+recursive-exclude * *-data
+exclude letsencrypt
+exclude data
+exclude logs
+
+# Exclude temporary files
+recursive-exclude * *.tmp
+recursive-exclude * *.log
+exclude temp
