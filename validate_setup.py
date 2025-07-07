@@ -321,7 +321,7 @@ def main():
     else:
         print(f"\n⚠️  {total - passed} validation checks failed. Please review the issues above.")
         print("\nCommon solutions:")
-        print("1. Re-run setup.py to fix dependency issues")
+        print("1. Re-run install.py to fix dependency issues")
         print("2. Check .env file configuration")
         print("3. Verify network connectivity to Wazuh server")
         return 1

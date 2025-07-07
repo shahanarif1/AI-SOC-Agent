@@ -43,9 +43,9 @@ A production-grade Model Context Protocol (MCP) server that integrates Wazuh SIE
    cd Wazuh-MCP-Server
    ```
 
-2. **Run the setup script**
+2. **Run the installation script**
    ```bash
-   python setup.py
+   python3 install.py
    ```
 
 3. **Configure Wazuh connection**
@@ -145,7 +145,9 @@ Wazuh-MCP-Server/
 ├── docs/                          # Documentation
 ├── .env                          # Environment configuration
 ├── requirements.txt              # Python dependencies
-└── setup.py                     # Installation script
+├── install.py                   # Installation script
+├── validate_setup.py            # Setup validation tool
+└── pyproject.toml               # Python package configuration
 ```
 
 ## 🔧 Advanced Configuration

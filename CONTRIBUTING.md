@@ -34,13 +34,15 @@ Thank you for your interest in contributing to the Wazuh MCP Server! This docume
 git clone https://github.com/YOUR_USERNAME/Wazuh-MCP-Server.git
 cd Wazuh-MCP-Server
 
-# Install in development mode
-pip install -e .
-pip install -r requirements-dev.txt
+# Run the installation script
+python3 install.py
 
 # Set up environment
-cp .env.example .env
 # Edit .env with your test Wazuh server details
+nano .env
+
+# Activate virtual environment
+source venv/bin/activate
 
 # Run tests
 pytest
@@ -49,11 +51,11 @@ pytest
 ruff check src/
 black --check src/
 
-# Test local mode
-python wazuh_mcp_server.py --stdio
+# Test the MCP server
+python src/wazuh_mcp_server/main.py --stdio
 
-# Test production mode
-./deploy.sh deploy
+# Validate setup
+python validate_setup.py
 ```
 
 ## 📝 Coding Standards
@@ -154,11 +156,11 @@ async def test_fetch_alerts_success(mock_wazuh_config):
 - Include code examples for new features
 
 ### Documentation Structure
-- **README.md** - Main project documentation
-- **docs/DEPLOYMENT_GUIDE.md** - Deployment options
-- **docs/LOCAL_SETUP.md** - Local development setup
-- **docs/REMOTE_SETUP.md** - Production deployment
-- **CHANGELOG.md** - Version history
+- **README.md** - Main project documentation and quick start
+- **docs/LOCAL_SETUP.md** - Local development setup guide
+- **docs/API_REFERENCE.md** - Complete API documentation
+- **docs/CONFIGURATION_REFERENCE.md** - Configuration options
+- **validate_setup.py** - Setup validation and troubleshooting
 
 ## 🔒 Security
 

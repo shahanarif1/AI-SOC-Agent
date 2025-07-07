@@ -28,7 +28,7 @@ cd Wazuh-MCP-Server
 The setup script will create a virtual environment and install all dependencies:
 
 ```bash
-python setup.py
+python3 install.py
 ```
 
 This will:
