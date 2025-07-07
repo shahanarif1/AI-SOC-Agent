@@ -48,54 +48,108 @@ A production-grade Model Context Protocol (MCP) server that integrates Wazuh SIE
    python3 install.py
    ```
 
-3. **Configure Wazuh connection**
+## 🔧 **Post-Installation Configuration**
+
+### **Step 1: Configure Wazuh Connection**
+
+1. **Edit the configuration file**
    ```bash
    # Edit .env file with your Wazuh details
    nano .env
    ```
 
-4. **Test the connection**
+2. **Update required fields** with your actual Wazuh server details:
+   ```env
+   # Wazuh Manager Configuration (REQUIRED)
+   WAZUH_HOST=your-wazuh-server.com     # Your Wazuh server IP/hostname
+   WAZUH_PORT=55000                     # Default Wazuh API port
+   WAZUH_USER=your-username             # Valid Wazuh API username
+   WAZUH_PASS=your-password             # Valid Wazuh API password
+
+   # Wazuh Indexer Configuration (OPTIONAL - for advanced features)
+   WAZUH_INDEXER_HOST=your-indexer-host.com
+   WAZUH_INDEXER_PORT=9200
+   WAZUH_INDEXER_USER=your-indexer-username
+   WAZUH_INDEXER_PASS=your-indexer-password
+
+   # Security Settings
+   VERIFY_SSL=false                     # Set to true for production with valid certs
+   WAZUH_ALLOW_SELF_SIGNED=true         # Set to false for production
+   ```
+
+### **Step 2: Test the Connection**
+
+1. **Activate virtual environment**
    ```bash
    source venv/bin/activate
+   ```
+
+2. **Test MCP server connection**
+   ```bash
    python src/wazuh_mcp_server/main.py --stdio
    ```
 
-### Configuration
+3. **Run connection validation**
+   ```bash
+   python src/wazuh_mcp_server/scripts/connection_validator.py
+   ```
 
-Edit the `.env` file with your Wazuh deployment details:
+4. **Comprehensive setup validation**
+   ```bash
+   python validate_setup.py
+   ```
 
-```env
-# Wazuh Manager Configuration
-WAZUH_HOST=your-wazuh-server.com
-WAZUH_PORT=55000
-WAZUH_USER=your-username
-WAZUH_PASS=your-password
+### **Step 3: Claude Desktop Integration**
 
-# Wazuh Indexer Configuration
-WAZUH_INDEXER_HOST=your-indexer-host.com
-WAZUH_INDEXER_PORT=9200
-WAZUH_INDEXER_USER=your-indexer-username
-WAZUH_INDEXER_PASS=your-indexer-password
+1. **Locate Claude Desktop settings file:**
+   - **Linux**: `~/.config/Claude/settings.json`
+   - **macOS**: `~/Library/Application Support/Claude/settings.json`
+   - **Windows**: `%APPDATA%\Claude\settings.json`
 
-# Security Settings
-VERIFY_SSL=false                    # Set to true for production
-WAZUH_ALLOW_SELF_SIGNED=true        # Set to false for production
-```
+2. **Add Wazuh MCP Server configuration:**
+   ```json
+   {
+     "mcpServers": {
+       "wazuh": {
+         "command": "python",
+         "args": ["/full/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"],
+         "env": {
+           "LOG_LEVEL": "INFO"
+         }
+       }
+     }
+   }
+   ```
+   
+   **Important**: Replace `/full/path/to/Wazuh-MCP-Server` with your actual project directory path.
 
-### Claude Desktop Integration
+3. **Restart Claude Desktop** completely for changes to take effect.
 
-Add the following to your Claude Desktop `settings.json`:
+### **Step 4: Test Integration**
 
-```json
-{
-  "mcpServers": {
-    "wazuh": {
-      "command": "python",
-      "args": ["/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"]
-    }
-  }
-}
-```
+1. **Open Claude Desktop** and start a new conversation
+2. **Test basic functionality** with these example queries:
+   - "Show me recent security alerts"
+   - "List all Wazuh agents"
+   - "What's the current security status of my infrastructure?"
+   - "Check for failed login attempts"
+
+### **Step 5: Verify Full Functionality**
+
+1. **Check all systems are working:**
+   ```bash
+   python validate_setup.py
+   ```
+
+2. **Monitor logs for issues:**
+   ```bash
+   tail -f logs/wazuh-mcp.log
+   ```
+
+3. **Test advanced features** (if Indexer is configured):
+   - Security analytics queries
+   - Compliance reporting
+   - Advanced threat hunting
 
 ## 📋 Supported Operations
 
@@ -216,6 +270,62 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🔧 **Quick Troubleshooting**
+
+### Common Issues and Solutions
+
+#### ❌ **Authentication Failed (HTTP 401)**
+```bash
+# Check credentials in .env file
+grep -E "WAZUH_(USER|PASS)" .env
+# Test connection
+python src/wazuh_mcp_server/scripts/connection_validator.py
+```
+
+#### ❌ **SSL Certificate Verification Failed**
+```env
+# For self-signed certificates, set in .env:
+VERIFY_SSL=false
+WAZUH_ALLOW_SELF_SIGNED=true
+```
+
+#### ❌ **Claude Desktop Not Recognizing MCP Server**
+```bash
+# Validate JSON syntax
+python -m json.tool ~/.config/Claude/settings.json
+# Use absolute paths in settings.json
+pwd  # Copy this path for Claude Desktop configuration
+```
+
+#### ❌ **Python Module Not Found**
+```bash
+# Check virtual environment
+source venv/bin/activate
+python -c "import wazuh_mcp_server; print('✅ Module found')"
+```
+
+### 🔍 **Diagnostic Commands**
+
+```bash
+# Comprehensive validation
+python validate_setup.py
+
+# Test connections
+python src/wazuh_mcp_server/scripts/connection_validator.py
+
+# Check logs
+tail -f logs/wazuh-mcp.log
+
+# Manual MCP server test
+python src/wazuh_mcp_server/main.py --stdio
+```
+
+### 📚 **Documentation References**
+
+- **Complete Setup Guide**: [docs/LOCAL_SETUP.md](docs/LOCAL_SETUP.md)
+- **Configuration Options**: [docs/CONFIGURATION_REFERENCE.md](docs/CONFIGURATION_REFERENCE.md)
+- **API Reference**: [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
 
 ## 🆘 Support
 

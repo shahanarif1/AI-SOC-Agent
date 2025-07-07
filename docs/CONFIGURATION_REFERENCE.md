@@ -6,13 +6,67 @@ This document provides comprehensive configuration options for the Wazuh MCP Ser
 
 ## Table of Contents
 
-1. [Environment Variables](#environment-variables)
-2. [Configuration Files](#configuration-files)
-3. [Security Configuration](#security-configuration)
-4. [Performance Tuning](#performance-tuning)
-5. [Logging Configuration](#logging-configuration)
-6. [Integration Settings](#integration-settings)
-7. [Platform-Specific Settings](#platform-specific-settings)
+1. [Post-Installation Configuration](#post-installation-configuration)
+2. [Environment Variables](#environment-variables)
+3. [Configuration Files](#configuration-files)
+4. [Security Configuration](#security-configuration)
+5. [Performance Tuning](#performance-tuning)
+6. [Logging Configuration](#logging-configuration)
+7. [Claude Desktop Integration](#claude-desktop-integration)
+8. [Validation and Testing](#validation-and-testing)
+9. [Platform-Specific Settings](#platform-specific-settings)
+
+---
+
+## Post-Installation Configuration
+
+### Quick Configuration Checklist
+
+After running `python3 install.py`, complete these essential configuration steps:
+
+#### 1. ✅ **Edit .env File**
+```bash
+nano .env
+```
+
+#### 2. ✅ **Update Wazuh Credentials**
+Replace placeholder values with your actual Wazuh server details:
+```env
+WAZUH_HOST=your-actual-wazuh-server.com
+WAZUH_USER=your-actual-username
+WAZUH_PASS=your-actual-password
+```
+
+#### 3. ✅ **Test Connection**
+```bash
+python src/wazuh_mcp_server/scripts/connection_validator.py
+```
+
+#### 4. ✅ **Configure Claude Desktop**
+Add to `~/.config/Claude/settings.json`:
+```json
+{
+  "mcpServers": {
+    "wazuh": {
+      "command": "python",
+      "args": ["/full/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"]
+    }
+  }
+}
+```
+
+#### 5. ✅ **Validate Setup**
+```bash
+python validate_setup.py
+```
+
+### Configuration Priority
+
+Settings are loaded in this order (later values override earlier ones):
+1. Default values in code
+2. `.env` file values
+3. Environment variables
+4. Command-line arguments
 
 ---
 
@@ -732,19 +786,201 @@ LOG_FORMAT=detailed
 
 ---
 
-## Best Practices
+## Claude Desktop Integration
 
-1. **Security**: Always use strong, unique passwords and API keys
-2. **SSL**: Enable SSL verification in production environments
-3. **Logging**: Use appropriate log levels for different environments
-4. **Performance**: Tune settings based on your infrastructure capacity
-5. **Monitoring**: Enable comprehensive logging and monitoring
-6. **Backup**: Backup configuration files regularly
-7. **Validation**: Validate configuration before deployment
-8. **Documentation**: Document custom configuration changes
+### Configuration File Location
+
+The Claude Desktop settings file location varies by operating system:
+
+- **Linux**: `~/.config/Claude/settings.json`
+- **macOS**: `~/Library/Application Support/Claude/settings.json`
+- **Windows**: `%APPDATA%\Claude\settings.json`
+
+### Basic Configuration
+
+Add the Wazuh MCP Server to your Claude Desktop settings:
+
+```json
+{
+  "mcpServers": {
+    "wazuh": {
+      "command": "python",
+      "args": ["/full/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"],
+      "env": {
+        "LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
+```
+
+### Advanced Configuration
+
+For more control over the MCP server:
+
+```json
+{
+  "mcpServers": {
+    "wazuh": {
+      "command": "/usr/bin/python3",
+      "args": [
+        "/full/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py",
+        "--stdio"
+      ],
+      "env": {
+        "LOG_LEVEL": "INFO",
+        "PYTHONPATH": "/full/path/to/Wazuh-MCP-Server/src",
+        "WAZUH_CONFIG_PATH": "/full/path/to/Wazuh-MCP-Server/.env"
+      },
+      "settings": {
+        "timeout": 30,
+        "retries": 3
+      }
+    }
+  }
+}
+```
+
+### Configuration Options
+
+#### Command Path Options
+- **System Python**: `"command": "python"` or `"command": "python3"`
+- **Absolute Path**: `"command": "/usr/bin/python3"`
+- **Virtual Environment**: `"command": "/path/to/project/venv/bin/python"`
+
+#### Environment Variables
+- `LOG_LEVEL`: Control logging verbosity (DEBUG, INFO, WARNING, ERROR)
+- `PYTHONPATH`: Ensure Python can find the module
+- `WAZUH_CONFIG_PATH`: Specify custom .env file location
+
+#### Args Options
+- `--stdio`: Use stdio for MCP communication (required)
+- `--debug`: Enable debug mode for troubleshooting
+- `--config /path/to/config`: Use custom configuration file
+
+### Troubleshooting Claude Desktop Integration
+
+#### Common Issues
+
+1. **Server Not Loading**
+   ```bash
+   # Validate JSON syntax
+   python -m json.tool ~/.config/Claude/settings.json
+   ```
+
+2. **Python Path Issues**
+   ```json
+   "command": "/usr/bin/python3"
+   ```
+
+3. **Module Not Found**
+   ```json
+   "env": {
+     "PYTHONPATH": "/full/path/to/Wazuh-MCP-Server/src"
+   }
+   ```
+
+#### Testing Configuration
+
+1. **Test MCP server manually:**
+   ```bash
+   python src/wazuh_mcp_server/main.py --stdio
+   ```
+
+2. **Check Claude Desktop logs** (varies by OS)
+
+3. **Validate setup:**
+   ```bash
+   python validate_setup.py
+   ```
 
 ---
 
-**Configuration Version:** 1.0.0  
+## Validation and Testing
+
+### Post-Configuration Validation
+
+After updating configuration, validate your setup:
+
+#### 1. Configuration Syntax Check
+```bash
+# Check .env file syntax
+python -c "from dotenv import load_dotenv; load_dotenv('.env'); print('✅ .env syntax valid')"
+```
+
+#### 2. Connection Test
+```bash
+# Test Wazuh connection
+python src/wazuh_mcp_server/scripts/connection_validator.py
+```
+
+#### 3. Comprehensive Validation
+```bash
+# Run full setup validation
+python validate_setup.py
+```
+
+#### 4. MCP Integration Test
+```bash
+# Test MCP server directly
+python src/wazuh_mcp_server/main.py --stdio
+```
+
+### Configuration Validation Checklist
+
+- ✅ **Credentials**: WAZUH_HOST, WAZUH_USER, WAZUH_PASS configured
+- ✅ **SSL Settings**: VERIFY_SSL appropriate for your environment
+- ✅ **Indexer**: WAZUH_INDEXER_* configured if using advanced features
+- ✅ **Logging**: LOG_LEVEL set appropriately
+- ✅ **Permissions**: .env file has 600 permissions
+- ✅ **Connectivity**: Connection validator shows success
+- ✅ **Claude Desktop**: settings.json configured with correct paths
+- ✅ **Integration**: Claude Desktop recognizes Wazuh tools
+
+---
+
+## Best Practices
+
+### Security
+1. **Credentials**: Use strong, unique passwords and API keys
+2. **SSL**: Enable SSL verification in production environments
+3. **Permissions**: Set .env file to 600 permissions (owner read/write only)
+4. **API Access**: Use dedicated service accounts with minimal required permissions
+
+### Performance
+1. **Logging**: Use appropriate log levels for different environments
+2. **Caching**: Enable caching for frequently accessed data
+3. **Rate Limiting**: Configure appropriate rate limits
+4. **Connection Pooling**: Tune connection pool settings for your load
+
+### Operational
+1. **Monitoring**: Enable comprehensive logging and monitoring
+2. **Backup**: Backup configuration files regularly
+3. **Validation**: Validate configuration before deployment
+4. **Documentation**: Document custom configuration changes
+5. **Updates**: Keep configuration aligned with Wazuh version updates
+
+### Development vs Production
+
+#### Development Configuration
+```env
+LOG_LEVEL=DEBUG
+VERIFY_SSL=false
+RATE_LIMIT_ENABLED=false
+CACHE_ENABLED=false
+```
+
+#### Production Configuration
+```env
+LOG_LEVEL=WARNING
+VERIFY_SSL=true
+RATE_LIMIT_ENABLED=true
+CACHE_ENABLED=true
+MAX_CONCURRENT_REQUESTS=100
+```
+
+---
+
+**Configuration Version:** 1.1.0  
 **Last Updated:** January 2024  
-**Compatible with:** Wazuh 4.5.0+, Python 3.9+
+**Compatible with:** Wazuh 4.8.0+, Python 3.9+
