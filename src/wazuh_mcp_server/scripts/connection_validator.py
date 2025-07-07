@@ -10,6 +10,7 @@ import socket
 import ssl
 import aiohttp
 import json
+import platform
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 import sys
@@ -22,6 +23,39 @@ from wazuh_mcp_server.config import WazuhConfig
 from wazuh_mcp_server.utils.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Windows console compatibility
+def _supports_unicode():
+    """Check if the terminal supports Unicode characters."""
+    try:
+        "✅".encode(sys.stdout.encoding or 'utf-8')
+        return True
+    except (UnicodeEncodeError, LookupError):
+        return False
+
+def _safe_print(text):
+    """Print text with Windows console compatibility."""
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        # Replace Unicode characters with ASCII equivalents
+        replacements = {
+            '✅': '[OK]',
+            '❌': '[FAIL]', 
+            '🔍': '[SEARCH]',
+            '📊': '[CHART]',
+            '📡': '[SIGNAL]',
+            '📋': '[INFO]',
+            '🔒': '[SECURE]',
+            '🔓': '[UNSECURE]',
+            '⚠️': '[WARN]',
+            '🎉': '[SUCCESS]',
+            '💡': '[TIP]'
+        }
+        safe_text = text
+        for unicode_char, ascii_replacement in replacements.items():
+            safe_text = safe_text.replace(unicode_char, ascii_replacement)
+        print(safe_text.encode('ascii', errors='replace').decode('ascii'))
 
 
 class ConnectionValidator:
@@ -37,19 +71,19 @@ class ConnectionValidator:
     
     async def validate_all_connections(self) -> Dict:
         """Validate all configured connections."""
-        print("🔍 Starting comprehensive connection validation...")
-        print()
+        _safe_print("🔍 Starting comprehensive connection validation...")
+        _safe_print("")
         
         # Test Wazuh Manager
         if self.config.host:
-            print(f"📡 Testing Wazuh Manager: {self.config.host}:{self.config.port}")
+            _safe_print(f"📡 Testing Wazuh Manager: {self.config.host}:{self.config.port}")
             manager_result = await self.test_manager_connection()
             self.results['manager'] = manager_result
             self._print_connection_result("Manager", manager_result)
         
         # Test Wazuh Indexer
         if hasattr(self.config, 'indexer_host') and self.config.indexer_host:
-            print(f"📊 Testing Wazuh Indexer: {self.config.indexer_host}:{self.config.indexer_port}")
+            _safe_print(f"📊 Testing Wazuh Indexer: {self.config.indexer_host}:{self.config.indexer_port}")
             indexer_result = await self.test_indexer_connection()
             self.results['indexer'] = indexer_result
             self._print_connection_result("Indexer", indexer_result)
@@ -228,32 +262,38 @@ class ConnectionValidator:
     def _print_connection_result(self, service: str, result: Dict):
         """Print formatted connection result."""
         if result['reachable']:
-            status = "✅ CONNECTED"
+            if _supports_unicode():
+                status = "✅ CONNECTED"
+            else:
+                status = "[CONNECTED]"
             if result.get('auth_success') or result.get('cluster_status'):
                 status += " & AUTHENTICATED"
         else:
-            status = "❌ FAILED"
+            if _supports_unicode():
+                status = "❌ FAILED" 
+            else:
+                status = "[FAILED]"
         
-        print(f"   {status}")
+        _safe_print(f"   {status}")
         
         if result['reachable']:
             if result.get('ssl_valid'):
-                print("   🔒 SSL: Valid certificate")
+                _safe_print("   🔒 SSL: Valid certificate")
             elif result.get('self_signed'):
-                print("   🔓 SSL: Self-signed certificate")
+                _safe_print("   🔓 SSL: Self-signed certificate")
             else:
-                print("   ⚠️  SSL: Verification disabled")
+                _safe_print("   ⚠️  SSL: Verification disabled")
             
             if result.get('api_version'):
-                print(f"   📋 API Version: {result['api_version']}")
+                _safe_print(f"   📋 API Version: {result['api_version']}")
             
             if result.get('cluster_status'):
-                print(f"   📊 Cluster Status: {result['cluster_status']}")
+                _safe_print(f"   📊 Cluster Status: {result['cluster_status']}")
         
         if result.get('error'):
-            print(f"   ❗ Error: {result['error']}")
+            _safe_print(f"   ❗ Error: {result['error']}")
         
-        print()
+        _safe_print("")
     
     def _generate_recommendations(self):
         """Generate configuration recommendations."""
@@ -299,10 +339,10 @@ class ConnectionValidator:
         self.results['recommendations'] = recommendations
         
         if recommendations:
-            print("💡 RECOMMENDATIONS:")
+            _safe_print("💡 RECOMMENDATIONS:")
             for rec in recommendations:
-                print(f"   {rec}")
-            print()
+                _safe_print(f"   {rec}")
+            _safe_print("")
 
 
 async def main():
@@ -318,22 +358,40 @@ async def main():
         results = await validator.validate_all_connections()
         
         # Print summary
-        print("📋 VALIDATION SUMMARY:")
-        print(f"   Manager: {'✅' if results['manager']['reachable'] else '❌'}")
-        print(f"   Indexer: {'✅' if results['indexer']['reachable'] else '❌'}")
+        _safe_print("📋 VALIDATION SUMMARY:")
+        if _supports_unicode():
+            manager_icon = '✅' if results['manager']['reachable'] else '❌'
+            indexer_icon = '✅' if results['indexer']['reachable'] else '❌'
+        else:
+            manager_icon = '[OK]' if results['manager']['reachable'] else '[FAIL]'
+            indexer_icon = '[OK]' if results['indexer']['reachable'] else '[FAIL]'
+        
+        _safe_print(f"   Manager: {manager_icon}")
+        _safe_print(f"   Indexer: {indexer_icon}")
         
         # Exit with appropriate code
         if results['manager']['reachable']:
-            print("\n🎉 Validation completed successfully!")
+            _safe_print("\n🎉 Validation completed successfully!")
             return 0
         else:
-            print("\n❌ Validation failed - check configuration and network connectivity")
+            _safe_print("\n❌ Validation failed - check configuration and network connectivity")
             return 1
     
     except Exception as e:
-        print(f"❌ Validation error: {e}")
+        _safe_print(f"❌ Validation error: {e}")
         return 1
 
 
 if __name__ == "__main__":
+    # Set up console encoding for Windows
+    if platform.system() == "Windows":
+        try:
+            # Try to set UTF-8 encoding for Windows console
+            import codecs
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'replace')
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'replace')
+        except Exception:
+            # If that fails, we'll use ASCII fallbacks in the print functions
+            pass
+    
     sys.exit(asyncio.run(main()))

@@ -42,10 +42,23 @@ for search_path in search_paths:
         env_file = potential_env
         break
 
-# Load environment variables from .env file if found
+# Load environment variables from .env file if found with encoding handling
 if env_file:
-    load_dotenv(dotenv_path=env_file)
-    logging.info(f"Loaded .env file from: {env_file}")
+    try:
+        # Try to load with explicit encoding handling for Windows
+        load_dotenv(dotenv_path=env_file, encoding='utf-8')
+        logging.info(f"Loaded .env file from: {env_file}")
+    except UnicodeDecodeError:
+        try:
+            # Fallback to UTF-8 with BOM
+            load_dotenv(dotenv_path=env_file, encoding='utf-8-sig')
+            logging.info(f"Loaded .env file from: {env_file} (with BOM)")
+        except UnicodeDecodeError:
+            # Final fallback to system default with error handling
+            import platform
+            default_encoding = 'cp1252' if platform.system() == 'Windows' else 'utf-8'
+            load_dotenv(dotenv_path=env_file, encoding=default_encoding)
+            logging.warning(f"Loaded .env file with {default_encoding} encoding (some characters may be replaced)")
 else:
     # Try loading from current working directory as fallback
     load_dotenv()
