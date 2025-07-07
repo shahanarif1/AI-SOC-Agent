@@ -1172,6 +1172,7 @@ class WazuhMCPServer:
 
 async def main():
     """Main entry point with comprehensive error handling."""
+    logger = get_logger(__name__)
     try:
         server = WazuhMCPServer()
         await server.run()

@@ -111,9 +111,7 @@ class SSLConfigurationManager:
         Returns:
             Dictionary of connector arguments
         """
-        connector_args = {
-            "timeout": config.ssl_timeout,
-        }
+        connector_args = {}
         
         if config.verify_ssl:
             ssl_context = self.create_ssl_context(config)

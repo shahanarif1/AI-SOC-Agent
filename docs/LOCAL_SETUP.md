@@ -1,98 +1,101 @@
 # Local Setup Guide - Wazuh MCP Server
 
-This comprehensive guide walks you through setting up the Wazuh MCP Server for local use with Claude Desktop and other MCP-compatible AI assistants.
+This guide provides step-by-step instructions for setting up the Wazuh MCP Server locally with Claude Desktop.
 
 ## Prerequisites
 
 ### System Requirements
-
 - **Python**: 3.9 or higher with pip
 - **Operating System**: Windows 10+, macOS 10.15+, or Linux (Ubuntu 20.04+)
-- **Memory**: 512MB+ available RAM
-- **Network**: Internet access for package installation
+- **Memory**: Minimum 2GB RAM available
+- **Network**: Access to your Wazuh deployment
 
-### Wazuh Infrastructure
+### Wazuh Requirements
+- **Wazuh Manager**: Version 4.8+ with API enabled
+- **Wazuh Indexer**: OpenSearch/Elasticsearch for advanced features
+- **API Credentials**: Valid username and password for Wazuh API
+- **Network Access**: HTTPS connectivity to Wazuh services
 
-- **Wazuh Server**: Version 4.5.0 or higher
-- **Network Access**: Connectivity to Wazuh API (default port 55000)
-- **Credentials**: Valid Wazuh API user account
-- **SSL**: Valid SSL certificate (recommended) or self-signed (development only)
+## Installation Steps
 
-### AI Assistant
-
-- **Claude Desktop**: Latest version
-- **Alternative MCP Clients**: Any MCP-compatible AI assistant
-
-## 🚀 Quick Start
-
-### 1. Install the Package
-
+### 1. Clone the Repository
 ```bash
-# Clone the repository
 git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
 cd Wazuh-MCP-Server
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Install the package in development mode
-pip install -e .
 ```
 
-### 2. Configure Environment
-
-Create a `.env` file in the project root:
+### 2. Run Setup Script
+The setup script will create a virtual environment and install all dependencies:
 
 ```bash
-# Copy the example file
-cp .env.example .env
-
-# Edit with your Wazuh configuration
-nano .env
+python setup.py
 ```
 
-Minimum required configuration:
+This will:
+- Check Python version compatibility
+- Create a virtual environment (`venv/`)
+- Install all required dependencies
+- Create configuration files
+- Set up logging directories
+
+### 3. Configure Environment
+Edit the `.env` file with your Wazuh deployment details:
+
+```bash
+# Edit with your preferred editor
+nano .env
+# or
+code .env
+```
+
+Required configuration:
 ```env
+# Wazuh Manager
 WAZUH_HOST=your-wazuh-server.com
 WAZUH_PORT=55000
 WAZUH_USER=your-username
 WAZUH_PASS=your-password
+
+# Wazuh Indexer
+WAZUH_INDEXER_HOST=your-indexer-host.com
+WAZUH_INDEXER_PORT=9200
+WAZUH_INDEXER_USER=your-indexer-username
+WAZUH_INDEXER_PASS=your-indexer-password
+
+# Security (adjust for your environment)
 VERIFY_SSL=false
+WAZUH_ALLOW_SELF_SIGNED=true
 ```
 
-### 3. Test the Connection
+### 4. Test Connection
+Verify your Wazuh connection:
 
 ```bash
-# Test the connection to your Wazuh server
-python wazuh_mcp_server.py --stdio
+source venv/bin/activate
+python src/wazuh_mcp_server/main.py --stdio
 ```
 
-## 🖥️ Claude Desktop Integration
+You should see initialization logs without authentication errors.
 
-### Configuration
+## Claude Desktop Integration
 
-Add the following to your Claude Desktop configuration file:
+### 1. Locate Claude Desktop Configuration
+Find your Claude Desktop settings file:
 
-**Location of config file:**
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **macOS**: `~/Library/Application Support/Claude/settings.json`
+- **Windows**: `%APPDATA%\Claude\settings.json`
+- **Linux**: `~/.config/Claude/settings.json`
 
-**Configuration:**
+### 2. Add MCP Server Configuration
+Add the Wazuh MCP server to your settings:
+
 ```json
 {
   "mcpServers": {
-    "wazuh-security": {
+    "wazuh": {
       "command": "python",
-      "args": [
-        "/absolute/path/to/Wazuh-MCP-Server/wazuh_mcp_server.py",
-        "--stdio"
-      ],
+      "args": ["/absolute/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"],
       "env": {
-        "WAZUH_HOST": "your-wazuh-server.com",
-        "WAZUH_PORT": "55000",
-        "WAZUH_USER": "your-username",
-        "WAZUH_PASS": "your-password",
-        "VERIFY_SSL": "false",
         "LOG_LEVEL": "INFO"
       }
     }
@@ -100,182 +103,143 @@ Add the following to your Claude Desktop configuration file:
 }
 ```
 
-### Alternative: Using Installed Package
+**Important**: Use the absolute path to your installation directory.
 
-If you installed the package system-wide:
+### 3. Restart Claude Desktop
+Close and restart Claude Desktop to load the new MCP server.
 
-```json
-{
-  "mcpServers": {
-    "wazuh-security": {
-      "command": "wazuh-mcp-server",
-      "args": ["--stdio"],
-      "env": {
-        "WAZUH_HOST": "your-wazuh-server.com",
-        "WAZUH_PORT": "55000",
-        "WAZUH_USER": "your-username",
-        "WAZUH_PASS": "your-password",
-        "VERIFY_SSL": "false"
-      }
-    }
-  }
-}
-```
+## Verification and Testing
 
-## 🔧 Environment Variables
+### 1. Check Claude Desktop Connection
+In Claude Desktop, you should see the Wazuh MCP server listed in available tools or you can ask Claude:
 
-### Required Variables
+"What security tools do you have access to?"
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `WAZUH_HOST` | Wazuh server hostname/IP | `wazuh.company.com` |
-| `WAZUH_USER` | Wazuh API username | `wazuh-user` |
-| `WAZUH_PASS` | Wazuh API password | `secure-password` |
+### 2. Test Basic Functionality
+Try these example queries in Claude Desktop:
 
-### Optional Variables
+- "Show me the status of my Wazuh agents"
+- "What security alerts do I have today?"
+- "Generate a compliance report for PCI DSS"
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `WAZUH_PORT` | `55000` | Wazuh API port |
-| `VERIFY_SSL` | `false` | Enable SSL verification |
-| `LOG_LEVEL` | `INFO` | Logging level |
-| `DEBUG` | `false` | Enable debug mode |
-
-### Wazuh Indexer (4.8.0+)
-
-For Wazuh 4.8.0+ with Indexer:
-
-```env
-WAZUH_INDEXER_HOST=your-indexer.com
-WAZUH_INDEXER_PORT=9200
-WAZUH_INDEXER_USER=admin
-WAZUH_INDEXER_PASS=indexer-password
-USE_INDEXER_FOR_ALERTS=true
-USE_INDEXER_FOR_VULNERABILITIES=true
-```
-
-### External Integrations
-
-```env
-# Optional threat intelligence APIs
-VIRUSTOTAL_API_KEY=your-vt-key
-SHODAN_API_KEY=your-shodan-key
-ABUSEIPDB_API_KEY=your-abuseipdb-key
-```
-
-## 🧪 Testing
-
-### Manual Testing
+### 3. Monitor Logs
+Check the application logs for any issues:
 
 ```bash
-# Test stdio mode (for Claude Desktop)
-python wazuh_mcp_server.py --stdio
-
-# The server will show initialization logs in stderr
-# and wait for MCP protocol messages on stdin
+tail -f logs/wazuh-mcp.log
 ```
 
-### Connection Test Script
+## Troubleshooting
 
-```bash
-# Use the built-in test script
-python -m wazuh_mcp_server.scripts.test_connection
+### Connection Issues
+1. **Authentication Failures**:
+   - Verify username/password in `.env`
+   - Check if user has API permissions in Wazuh
+   - Ensure API is enabled on Wazuh Manager
 
-# Or use the standalone script
-python src/wazuh_mcp_server/scripts/test_connection.py
-```
+2. **SSL Certificate Issues**:
+   - Set `VERIFY_SSL=false` for self-signed certificates
+   - Set `WAZUH_ALLOW_SELF_SIGNED=true`
+   - For production, use proper CA certificates
 
-## 🔍 Troubleshooting
+3. **Network Connectivity**:
+   - Verify firewall settings
+   - Test manual connection: `curl -k https://your-wazuh-host:55000`
+   - Check DNS resolution
 
-### Common Issues
-
-1. **Import Errors**
-   ```bash
-   # Ensure package is installed
-   pip install -e .
-   
-   # Check Python path
-   python -c "import wazuh_mcp_server; print('OK')"
-   ```
-
-2. **Wazuh Connection Failed**
-   ```bash
-   # Test manually
-   curl -k -u username:password https://wazuh-host:55000/
-   
-   # Check firewall/network
-   telnet wazuh-host 55000
-   ```
-
-3. **SSL Issues**
-   ```env
-   # Disable SSL verification (development only)
-   VERIFY_SSL=false
-   
-   # Or provide custom CA bundle
-   CA_BUNDLE_PATH=/path/to/ca-bundle.pem
-   ```
-
-4. **Claude Desktop Not Finding Server**
-   - Use absolute paths in configuration
-   - Check that Python is in PATH
-   - Verify environment variables are set
+### Claude Desktop Issues
+1. **MCP Server Not Loading**:
+   - Check settings.json syntax
+   - Verify absolute path to main.py
+   - Restart Claude Desktop
    - Check Claude Desktop logs
 
-### Debug Mode
+2. **Permission Errors**:
+   - Ensure virtual environment is activated
+   - Check file permissions on `.env` (should be 600)
+   - Verify Python executable path
 
-Enable detailed logging:
+### Performance Issues
+1. **Slow Response Times**:
+   - Increase timeouts in `.env`:
+     ```env
+     WAZUH_REQUEST_TIMEOUT=60
+     WAZUH_SSL_TIMEOUT=30
+     ```
+   - Check network latency to Wazuh server
 
-```json
-{
-  "mcpServers": {
-    "wazuh-security": {
-      "command": "python",
-      "args": ["/path/to/wazuh_mcp_server.py", "--stdio"],
-      "env": {
-        "DEBUG": "true",
-        "LOG_LEVEL": "DEBUG",
-        // ... other config
-      }
-    }
-  }
-}
+2. **Memory Usage**:
+   - Monitor with: `ps aux | grep python`
+   - Reduce concurrent connections:
+     ```env
+     WAZUH_MAX_CONNECTIONS=5
+     ```
+
+## Advanced Configuration
+
+### SSL/TLS Security
+For production environments:
+
+```env
+VERIFY_SSL=true
+WAZUH_ALLOW_SELF_SIGNED=false
+WAZUH_CA_BUNDLE_PATH=/path/to/ca-bundle.pem
 ```
 
-## 🎯 Available Tools
+### Custom Logging
+Adjust logging levels:
 
-Once configured, Claude Desktop will have access to these tools:
-
-- **get_alerts** - Retrieve security alerts with filtering
-- **get_agents** - Get Wazuh agent information
-- **analyze_threats** - Perform threat analysis
-- **get_vulnerabilities** - Get vulnerability data
-- **security_overview** - Comprehensive security dashboard
-- **get_agent_processes** - List agent processes
-- **get_agent_ports** - Show open ports
-- **search_wazuh_logs** - Search log data
-- **get_cluster_health** - Cluster status information
-
-## 📝 Usage Examples
-
-Ask Claude Desktop:
-
-- "Show me the latest security alerts from Wazuh"
-- "What agents are currently offline?"
-- "Analyze the threat landscape for the last hour"
-- "Show me all critical vulnerabilities"
-- "What processes are running on agent 001?"
-
-## 🔄 Updates
-
-To update the MCP server:
-
-```bash
-# Pull latest changes
-git pull origin main
-
-# Reinstall package
-pip install -e .
-
-# Restart Claude Desktop to reload the MCP server
+```env
+LOG_LEVEL=DEBUG  # For troubleshooting
+LOG_LEVEL=INFO   # For normal operation
+LOG_LEVEL=ERROR  # For minimal logging
 ```
+
+### Performance Tuning
+Optimize for your environment:
+
+```env
+WAZUH_MAX_CONNECTIONS=10
+WAZUH_REQUEST_TIMEOUT=30
+WAZUH_RATE_LIMIT=10
+```
+
+## Security Best Practices
+
+1. **Credential Management**:
+   - Use dedicated service accounts
+   - Rotate credentials regularly
+   - Set minimal required permissions
+
+2. **File Permissions**:
+   ```bash
+   chmod 600 .env
+   chmod 755 logs/
+   ```
+
+3. **Network Security**:
+   - Use VPN for remote connections
+   - Enable firewall rules
+   - Monitor access logs
+
+## Support
+
+If you encounter issues:
+
+1. Check the [troubleshooting section](#troubleshooting)
+2. Review logs in `logs/` directory
+3. Search [GitHub Issues](https://github.com/gensecaihq/Wazuh-MCP-Server/issues)
+4. Create a new issue with:
+   - Operating system and Python version
+   - Wazuh version and deployment type
+   - Error messages and logs
+   - Steps to reproduce
+
+## Next Steps
+
+Once successfully set up:
+
+- Explore available security operations in Claude Desktop
+- Review [API Reference](API_REFERENCE.md) for advanced usage
+- Configure compliance frameworks in [Configuration Reference](CONFIGURATION_REFERENCE.md)
+- Set up monitoring and alerting workflows
