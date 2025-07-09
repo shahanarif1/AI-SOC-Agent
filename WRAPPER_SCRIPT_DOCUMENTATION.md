@@ -2,17 +2,18 @@
 
 ## Overview
 
-The `mcp_wrapper.sh` script is a comprehensive solution to run the Wazuh MCP Server from Claude Desktop on macOS, addressing the read-only file system issues and environment configuration problems.
+The `mcp_wrapper.sh` script is a comprehensive solution to run the Wazuh MCP Server from Claude Desktop on Unix-like systems (macOS and Linux), addressing read-only file system issues and environment configuration problems.
 
 ## Scope and Purpose
 
 ### Problems Solved
 
-1. **Read-only file system error**: Creates a temporary writable directory for logs
+1. **Read-only file system error**: Creates a temporary writable directory for logs (especially important on macOS)
 2. **Working directory issues**: Ensures the server runs from the correct project directory
-3. **Environment variable loading**: Properly loads .env configuration
+3. **Environment variable loading**: Properly loads .env configuration across Unix systems
 4. **Process management**: Handles signals and cleanup properly
 5. **Python environment**: Uses the correct virtual environment
+6. **Cross-platform compatibility**: Works seamlessly on both macOS and Linux
 
 ### Functionality
 
@@ -250,13 +251,22 @@ Monitor the wrapper by:
 
 ## Compatibility
 
-### macOS Versions
+### Supported Platforms
 
-Tested on:
+**macOS:**
 - macOS 10.15+
 - macOS 11.0+
 - macOS 12.0+
 - macOS 13.0+
+- macOS 14.0+
+
+**Linux:**
+- Ubuntu 20.04+
+- Debian 11+
+- CentOS 8+
+- Fedora 34+
+- Arch Linux
+- Other modern Linux distributions
 
 ### Claude Desktop Versions
 
@@ -288,4 +298,4 @@ The wrapper is optimized for:
 
 ## Conclusion
 
-The wrapper script provides a robust, production-ready solution for running the Wazuh MCP Server from Claude Desktop, handling all environment issues without requiring modifications to the existing codebase.
+The wrapper script provides a robust, production-ready solution for running the Wazuh MCP Server from Claude Desktop on Unix-like systems (macOS and Linux), handling all environment issues without requiring modifications to the existing codebase. This unified approach ensures consistent behavior across different Unix platforms while maintaining compatibility with Claude Desktop's requirements.

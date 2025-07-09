@@ -56,9 +56,9 @@ The configuration file location:
 
 Add the appropriate configuration for your platform:
 
-### macOS Configuration
+### macOS/Linux Configuration
 
-**Important**: macOS requires the wrapper script due to Claude Desktop's read-only filesystem restrictions.
+**Recommended**: Use the wrapper script for better environment handling and compatibility.
 
 ```json
 {
@@ -71,7 +71,7 @@ Add the appropriate configuration for your platform:
 }
 ```
 
-### Linux/Windows Configuration
+### Windows Configuration
 
 ```json
 {
@@ -85,13 +85,13 @@ Add the appropriate configuration for your platform:
 }
 ```
 
-**Using Virtual Environment** (recommended for Linux/Windows):
+**Using Virtual Environment** (recommended for Windows):
 ```json
 {
   "mcpServers": {
     "wazuh": {
-      "command": "/full/path/to/Wazuh-MCP-Server/venv/bin/python",
-      "args": ["/full/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"]
+      "command": "C:/full/path/to/Wazuh-MCP-Server/venv/Scripts/python.exe",
+      "args": ["C:/full/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"]
     }
   }
 }
@@ -102,6 +102,8 @@ Replace `/full/path/to/Wazuh-MCP-Server` with your actual installation path.
 **Note**: The configuration file is not created automatically. You must use Claude Desktop's Developer settings to create it.
 
 For detailed setup instructions, see [Claude Desktop Setup Guide](docs/claude-desktop-setup.md).
+
+**Note**: Unix systems (macOS/Linux) use the wrapper script for optimal compatibility, while Windows uses direct Python execution.
 
 ### 4. Test
 
@@ -195,9 +197,9 @@ curl -u username:password https://your-wazuh:55000/
   - Linux: `~/.config/Claude/claude_desktop_config.json`
   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
-### macOS-Specific Issues
+### macOS/Linux Issues
 
-**Problem**: "Read-only file system" errors
+**Problem**: "Read-only file system" errors or environment issues
 
 **Solution**: Use the wrapper script instead of direct Python execution:
 
@@ -223,7 +225,7 @@ curl -u username:password https://your-wazuh:55000/
    }
    ```
 
-**Why this is needed**: Claude Desktop on macOS runs MCP servers from read-only locations, requiring temporary directories for logs and proper environment setup.
+**Why this is recommended**: The wrapper script handles environment setup, working directories, and temporary file creation across Unix-like systems (macOS/Linux). See [Unix Troubleshooting Guide](docs/unix-troubleshooting.md) for detailed information.
 
 ### SSL Issues
 
@@ -252,17 +254,23 @@ WAZUH_ALLOW_SELF_SIGNED=true
 - Network access to Wazuh API (port 55000)
 - Dedicated Wazuh API user (not dashboard credentials)
 
-### macOS
+### macOS/Linux
 - Bash shell (for wrapper script)
 - Write permissions for temporary directories
-
-### Linux
 - Standard development tools (gcc, make) for some dependencies
-- XDG-compatible desktop environment
+- Execute permissions for wrapper script (`chmod +x mcp_wrapper.sh`)
 
 ### Windows
 - Windows Terminal or PowerShell (recommended)
 - Visual Studio Build Tools (for some dependencies)
+- Python properly installed and in PATH
+
+## Documentation
+
+- [Claude Desktop Setup Guide](docs/claude-desktop-setup.md) - Complete setup instructions
+- [Unix Troubleshooting Guide](docs/unix-troubleshooting.md) - macOS/Linux troubleshooting  
+- [Windows Troubleshooting Guide](docs/windows-troubleshooting.md) - Windows-specific issues
+- [Wrapper Script Documentation](WRAPPER_SCRIPT_DOCUMENTATION.md) - Technical details
 
 ## Support
 

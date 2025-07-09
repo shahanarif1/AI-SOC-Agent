@@ -43,9 +43,9 @@ Claude Desktop stores its MCP server configuration in a specific location based 
 
 ### 3. Add Platform-Specific Configuration
 
-#### macOS Configuration
+#### macOS/Linux Configuration
 
-**Important**: macOS requires the wrapper script due to Claude Desktop's read-only filesystem restrictions.
+**Recommended**: Use the wrapper script for better environment handling and compatibility.
 
 ```json
 {
@@ -66,7 +66,12 @@ Claude Desktop stores its MCP server configuration in a specific location based 
 "command": "/Users/username/Documents/Wazuh-MCP-Server/mcp_wrapper.sh"
 ```
 
-#### Linux/Windows Configuration
+**Linux Example:**
+```json
+"command": "/home/username/Wazuh-MCP-Server/mcp_wrapper.sh"
+```
+
+#### Windows Configuration
 
 ```json
 {
@@ -82,9 +87,9 @@ Claude Desktop stores its MCP server configuration in a specific location based 
 }
 ```
 
-**Linux Example:**
+**Windows Example:**
 ```json
-"args": ["/home/username/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"]
+"args": ["C:/Users/username/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"]
 ```
 
 ### 4. Update the Path
@@ -98,11 +103,26 @@ Replace `/path/to/Wazuh-MCP-Server` with your actual installation path:
 
 > **Note**: On Windows, use forward slashes `/` or double backslashes `\\` in paths.
 
-### 5. Using Virtual Environment (Recommended for Linux/Windows)
+### 5. Using Virtual Environment (Recommended for Windows)
 
-**macOS**: The wrapper script automatically handles virtual environment activation.
+**macOS/Linux**: The wrapper script automatically handles virtual environment activation. See [Unix Troubleshooting Guide](unix-troubleshooting.md) for detailed information.
 
-**Linux:**
+**Windows with Virtual Environment:**
+```json
+{
+  "mcpServers": {
+    "wazuh": {
+      "command": "C:/path/to/Wazuh-MCP-Server/venv/Scripts/python.exe",
+      "args": ["C:/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"],
+      "env": {
+        "LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
+```
+
+**Alternative for Linux/macOS (without wrapper script):**
 ```json
 {
   "mcpServers": {
@@ -117,20 +137,7 @@ Replace `/path/to/Wazuh-MCP-Server` with your actual installation path:
 }
 ```
 
-**Windows:**
-```json
-{
-  "mcpServers": {
-    "wazuh": {
-      "command": "C:/path/to/Wazuh-MCP-Server/venv/Scripts/python.exe",
-      "args": ["C:/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"],
-      "env": {
-        "LOG_LEVEL": "INFO"
-      }
-    }
-  }
-}
-```
+> **Note**: Using the wrapper script is recommended for macOS/Linux as it handles environment setup automatically.
 
 ### 6. Save and Restart
 
@@ -193,8 +200,8 @@ After restarting Claude Desktop:
 
 1. **Create API User** (if not done already):
    - Login to Wazuh Dashboard
-   - Go to **Security** → **Internal users**
-   - Create a new user with `wazuh` backend role
+   - Go to **Server Management** → **Security** → **Users**
+   - Create a new user with appropriate roles
    - Use these credentials in your `.env` file
 
 2. **Test API Authentication**:
@@ -209,6 +216,22 @@ After restarting Claude Desktop:
    - Default admin account may be disabled for API access
    - User must have proper backend roles assigned
    - Check that `WAZUH_USER` and `WAZUH_PASS` in `.env` match your API user
+
+### Platform-Specific Issues
+
+**macOS/Linux Wrapper Script Issues**:
+
+1. **Permission Issues**:
+   ```bash
+   chmod +x mcp_wrapper.sh
+   ```
+
+2. **Test the wrapper**:
+   ```bash
+   ./mcp_wrapper.sh --stdio
+   ```
+
+3. **Environment Issues**: The wrapper script handles .env loading and virtual environment activation automatically. See [Unix Troubleshooting Guide](unix-troubleshooting.md) for comprehensive troubleshooting.
 
 ### Environment Variables
 
@@ -281,6 +304,9 @@ Enable debug logging for troubleshooting:
 
 ## Getting Help
 
-- **Documentation**: Check the main [README.md](../README.md)
+- **Unix Systems (macOS/Linux)**: See [Unix Troubleshooting Guide](unix-troubleshooting.md)
+- **Windows**: See [Windows Troubleshooting Guide](windows-troubleshooting.md)  
+- **Wrapper Script**: See [Wrapper Script Documentation](../WRAPPER_SCRIPT_DOCUMENTATION.md)
+- **Main Documentation**: Check the main [README.md](../README.md)
 - **Issues**: Report problems on [GitHub](https://github.com/gensecaihq/Wazuh-MCP-Server/issues)
 - **MCP Documentation**: Learn more about MCP at [modelcontextprotocol.io](https://modelcontextprotocol.io)
