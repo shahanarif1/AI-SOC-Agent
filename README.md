@@ -27,11 +27,11 @@ python3 install.py
 **Important**: Create a dedicated API user in Wazuh Dashboard first:
 
 1. Login to Wazuh Dashboard (https://your-wazuh-server:443)
-2. Go to **Security** → **Internal users**
-3. Click **Create internal user**
+2. Go to ** Server Management ** **Security** → **Users**
+3. Click **Create user**
 4. Username: `wazuh-mcp-api` (or your preferred name)
 5. Password: Generate a strong password
-6. Backend roles: `wazuh`
+6. Backend roles: `Select Appropriate one`
 
 Then edit `.env` with your Wazuh details:
 
@@ -227,7 +227,7 @@ curl -u username:password https://your-wazuh:55000/
 
 ### SSL Issues
 
-**For production** (recommended):
+**For production: Only If you have a proper SSL installed** (recommended):
 ```env
 # Use proper SSL verification with self-signed certificate support
 VERIFY_SSL=true
