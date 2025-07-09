@@ -24,31 +24,84 @@ python3 install.py
 
 ### 2. Configure
 
-Edit `.env` with your Wazuh details:
+**Important**: Create a dedicated API user in Wazuh Dashboard first:
+
+1. Login to Wazuh Dashboard (https://your-wazuh-server:443)
+2. Go to **Security** → **Internal users**
+3. Click **Create internal user**
+4. Username: `wazuh-mcp-api` (or your preferred name)
+5. Password: Generate a strong password
+6. Backend roles: `wazuh`
+
+Then edit `.env` with your Wazuh details:
 
 ```env
 WAZUH_HOST=your-wazuh-server.com
-WAZUH_USER=your-username
-WAZUH_PASS=your-password
+WAZUH_USER=wazuh-mcp-api
+WAZUH_PASS=your-api-password
 ```
 
 ### 3. Add to Claude Desktop
 
-Add this to your Claude Desktop settings (`~/.config/Claude/settings.json`):
+First, create the configuration file in Claude Desktop:
+
+1. Open Claude Desktop
+2. Go to **Settings** → **Developer**
+3. Click **Edit Config** to create/open `claude_desktop_config.json`
+
+The configuration file location:
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+Add the appropriate configuration for your platform:
+
+### macOS Configuration
+
+**Important**: macOS requires the wrapper script due to Claude Desktop's read-only filesystem restrictions.
+
+```json
+{
+  "mcpServers": {
+    "wazuh": {
+      "command": "/full/path/to/Wazuh-MCP-Server/mcp_wrapper.sh",
+      "args": ["--stdio"]
+    }
+  }
+}
+```
+
+### Linux/Windows Configuration
 
 ```json
 {
   "mcpServers": {
     "wazuh": {
       "command": "python",
-      "args": ["/full/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py"],
+      "args": ["/full/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"],
       "env": {}
     }
   }
 }
 ```
 
+**Using Virtual Environment** (recommended for Linux/Windows):
+```json
+{
+  "mcpServers": {
+    "wazuh": {
+      "command": "/full/path/to/Wazuh-MCP-Server/venv/bin/python",
+      "args": ["/full/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"]
+    }
+  }
+}
+```
+
 Replace `/full/path/to/Wazuh-MCP-Server` with your actual installation path.
+
+**Note**: The configuration file is not created automatically. You must use Claude Desktop's Developer settings to create it.
+
+For detailed setup instructions, see [Claude Desktop Setup Guide](docs/claude-desktop-setup.md).
 
 ### 4. Test
 
@@ -108,24 +161,108 @@ python validate_setup.py
 curl -u username:password https://your-wazuh:55000/
 ```
 
+### Authentication Issues
+
+**Problem**: "Invalid credentials" error despite correct dashboard login
+
+**Solution**: Wazuh Dashboard and API use separate authentication systems.
+
+1. **Create API User**:
+   - Login to Wazuh Dashboard
+   - Go to **Security** → **Internal users**
+   - Create a new user with `wazuh` backend role
+   - Use these credentials in your `.env` file
+
+2. **Test API Authentication**:
+   ```bash
+   curl -k -X POST "https://your-wazuh:55000/security/user/authenticate" \
+     -H "Content-Type: application/json" \
+     -d '{"username":"your-api-user","password":"your-api-password"}'
+   ```
+
+3. **Common Issues**:
+   - Dashboard credentials ≠ API credentials
+   - Default admin account may be disabled for API
+   - User must have proper backend roles assigned
+
 ### Claude Desktop Issues
-- Ensure the path in settings.json is absolute and correct
+- Ensure the path in claude_desktop_config.json is absolute and correct
+- The config file must be created through Claude Desktop Settings → Developer → Edit Config
 - Restart Claude Desktop after adding the server
 - Check Claude Desktop logs for errors
+- Verify the config file location:
+  - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+  - Linux: `~/.config/Claude/claude_desktop_config.json`
+  - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+### macOS-Specific Issues
+
+**Problem**: "Read-only file system" errors
+
+**Solution**: Use the wrapper script instead of direct Python execution:
+
+1. **Ensure wrapper script is executable**:
+   ```bash
+   chmod +x /path/to/Wazuh-MCP-Server/mcp_wrapper.sh
+   ```
+
+2. **Test the wrapper**:
+   ```bash
+   ./mcp_wrapper.sh --stdio
+   ```
+
+3. **Use wrapper in Claude Desktop config**:
+   ```json
+   {
+     "mcpServers": {
+       "wazuh": {
+         "command": "/full/path/to/Wazuh-MCP-Server/mcp_wrapper.sh",
+         "args": ["--stdio"]
+       }
+     }
+   }
+   ```
+
+**Why this is needed**: Claude Desktop on macOS runs MCP servers from read-only locations, requiring temporary directories for logs and proper environment setup.
 
 ### SSL Issues
+
+**For production** (recommended):
 ```env
-# For development with self-signed certificates
+# Use proper SSL verification with self-signed certificate support
+VERIFY_SSL=true
+WAZUH_ALLOW_SELF_SIGNED=true
+```
+
+**For development only**:
+```env
+# Disable SSL verification completely (not recommended for production)
 VERIFY_SSL=false
 WAZUH_ALLOW_SELF_SIGNED=true
 ```
 
-## Requirements
+> **Security Note**: `VERIFY_SSL=true` with `WAZUH_ALLOW_SELF_SIGNED=true` provides the best balance of security and compatibility.
 
+## Platform-Specific Requirements
+
+### All Platforms
 - Python 3.9+
 - Wazuh Manager 4.8+
 - Claude Desktop
 - Network access to Wazuh API (port 55000)
+- Dedicated Wazuh API user (not dashboard credentials)
+
+### macOS
+- Bash shell (for wrapper script)
+- Write permissions for temporary directories
+
+### Linux
+- Standard development tools (gcc, make) for some dependencies
+- XDG-compatible desktop environment
+
+### Windows
+- Windows Terminal or PowerShell (recommended)
+- Visual Studio Build Tools (for some dependencies)
 
 ## Support
 

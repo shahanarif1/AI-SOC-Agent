@@ -48,15 +48,23 @@ WAZUH_ALLOW_SELF_SIGNED=true
 
 ## Claude Desktop Setup
 
-### Settings File Location
+### Configuration File Location
 ```
-%APPDATA%\Claude\settings.json
+%APPDATA%\Claude\claude_desktop_config.json
 ```
 
+### Creating the Configuration
+1. Open Claude Desktop
+2. Go to **Settings** → **Developer**
+3. Click **Edit Config** to create/open the configuration file
+4. Add your MCP server configuration
+
 ### Common Issues
+- The config file is NOT created automatically - use Claude Desktop's Developer settings
 - Use forward slashes `/` or double backslashes `\\` in paths
 - Ensure Python is in PATH
 - Restart Claude Desktop after changes
+- Example path format: `C:/Users/YourName/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py`
 
 ## Getting Help
 

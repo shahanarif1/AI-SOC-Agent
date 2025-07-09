@@ -532,13 +532,15 @@ def show_completion_message(system_info: Dict[str, str]):
     
     # OS-specific Claude Desktop paths
     if system_info['os'] == 'Darwin':
-        config_path = "~/Library/Application Support/Claude/settings.json"
+        config_path = "~/Library/Application Support/Claude/claude_desktop_config.json"
     elif system_info['os'] == 'Windows':
-        config_path = "%APPDATA%\\Claude\\settings.json"
+        config_path = "%APPDATA%\\Claude\\claude_desktop_config.json"
     else:
-        config_path = "~/.config/Claude/settings.json"
+        config_path = "~/.config/Claude/claude_desktop_config.json"
     
-    print(f"   • Edit Claude Desktop settings: {config_path}")
+    print("   • Open Claude Desktop")
+    print("   • Go to Settings → Developer → Edit Config")
+    print(f"   • This will create/open: {config_path}")
     print("   • Add this configuration:")
     print()
     print(f"{Colors.BLUE}{claude_config}{Colors.END}")
