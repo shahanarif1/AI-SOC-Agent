@@ -4,9 +4,8 @@
 # for stability and security in production environments.
 
 # Core MCP and Async Framework
-mcp>=0.1.0                    # MCP protocol implementation
+mcp>=1.10.1                    # MCP protocol implementation
 aiohttp>=3.8.0,<4.0.0        # Async HTTP client with security updates
-websockets>=10.0,<13.0       # WebSocket support
 
 # Data Validation and Configuration
 pydantic>=1.10.0,<3.0.0      # Data validation and settings

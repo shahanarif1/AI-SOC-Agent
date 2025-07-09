@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Production-ready validation script for Wazuh MCP Server setup.
+"""Production-ready validation script for Wazuh MCP Server setup with auto-fix capabilities.
 
 This script performs comprehensive validation of the entire installation,
 including security, performance, and production-readiness checks.
@@ -11,6 +11,7 @@ Features:
 - Connection resilience testing
 - Production deployment readiness
 - Detailed diagnostics and recommendations
+- Auto-fix functionality for common issues (Linux/macOS)
 """
 
 import sys
@@ -24,10 +25,15 @@ import socket
 import psutil
 import concurrent.futures
 import os
+import shutil
+import urllib.request
+import tempfile
+import stat
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 from datetime import datetime
 import logging
+import argparse
 
 
 def print_header():
@@ -47,10 +53,15 @@ def print_header():
 def _supports_unicode():
     """Check if the terminal supports Unicode characters."""
     try:
+        # Get encoding safely - handle cases where stdout doesn't have encoding attribute
+        encoding = getattr(sys.stdout, 'encoding', None)
+        if encoding is None:
+            encoding = 'utf-8'
+        
         # Test if we can encode/print Unicode
-        "✅".encode(sys.stdout.encoding or 'utf-8')
+        "✅".encode(encoding)
         return True
-    except (UnicodeEncodeError, LookupError):
+    except (UnicodeEncodeError, LookupError, AttributeError):
         return False
 
 
@@ -728,6 +739,418 @@ def check_production_readiness():
     
     return all_ready
 
+
+# ========== AUTO-FIX FUNCTIONALITY ==========
+
+class AutoFixer:
+    """Handles auto-fix functionality for common issues."""
+    
+    def __init__(self, interactive: bool = True):
+        self.interactive = interactive
+        self.fixes_applied = []
+        self.fixes_failed = []
+        self.system = platform.system()
+        self.is_macos = self.system == "Darwin"
+        self.is_linux = self.system == "Linux"
+        
+    def run_with_sudo(self, cmd: List[str]) -> subprocess.CompletedProcess:
+        """Run command with sudo privileges."""
+        if os.geteuid() == 0:
+            # Already root
+            return subprocess.run(cmd, capture_output=True, text=True)
+        
+        # Need sudo
+        if self.interactive:
+            print("🔐 Administrator access required")
+            return subprocess.run(['sudo'] + cmd)
+        else:
+            # Non-interactive mode
+            sudo_cmd = ['sudo', '-n'] + cmd
+            return subprocess.run(sudo_cmd, capture_output=True, text=True)
+    
+    def detect_package_manager(self) -> Optional[str]:
+        """Detect the system package manager."""
+        if self.is_macos:
+            # Check for Homebrew
+            if shutil.which('brew'):
+                return 'brew'
+        elif self.is_linux:
+            # Check for various package managers
+            if shutil.which('apt-get'):
+                return 'apt'
+            elif shutil.which('yum'):
+                return 'yum'
+            elif shutil.which('dnf'):
+                return 'dnf'
+            elif shutil.which('pacman'):
+                return 'pacman'
+        return None
+    
+    def fix_system_packages(self) -> bool:
+        """Fix missing system packages."""
+        print("\n🔧 Fixing system packages...")
+        
+        pkg_manager = self.detect_package_manager()
+        if not pkg_manager:
+            print("❌ Could not detect package manager")
+            self.fixes_failed.append("System packages")
+            return False
+        
+        # Define packages by package manager
+        packages = {
+            'brew': [
+                'python@3.13',
+                'openssl',
+                'libffi',
+                'ca-certificates'
+            ],
+            'apt': [
+                'python3.13',
+                'python3.13-venv',
+                'python3.13-dev',
+                'python3.13-distutils',
+                'build-essential',
+                'libssl-dev',
+                'libffi-dev',
+                'libbz2-dev',
+                'libreadline-dev',
+                'libsqlite3-dev',
+                'wget',
+                'curl',
+                'llvm',
+                'libncurses5-dev',
+                'libncursesw5-dev',
+                'xz-utils',
+                'tk-dev',
+                'liblzma-dev',
+                'ca-certificates'
+            ],
+            'yum': [
+                'python3.13',
+                'python3.13-devel',
+                'gcc',
+                'openssl-devel',
+                'bzip2-devel',
+                'libffi-devel',
+                'zlib-devel',
+                'xz-devel',
+                'wget'
+            ],
+            'dnf': [
+                'python3.13',
+                'python3.13-devel',
+                'gcc',
+                'openssl-devel',
+                'bzip2-devel',
+                'libffi-devel',
+                'zlib-devel',
+                'xz-devel',
+                'wget'
+            ]
+        }
+        
+        install_packages = packages.get(pkg_manager, [])
+        
+        try:
+            if pkg_manager == 'brew':
+                # Update Homebrew
+                print("   Updating Homebrew...")
+                subprocess.run(['brew', 'update'], capture_output=True)
+                
+                # Install packages
+                for pkg in install_packages:
+                    print(f"   Installing {pkg}...")
+                    result = subprocess.run(['brew', 'install', pkg], capture_output=True, text=True)
+                    if result.returncode != 0:
+                        print(f"   ⚠️  Failed to install {pkg}")
+                
+            elif pkg_manager == 'apt':
+                # Check if we need to add deadsnakes PPA for Python 3.13
+                if not shutil.which('python3.13'):
+                    print("   Adding Python 3.13 repository...")
+                    self.run_with_sudo(['apt-get', 'update'])
+                    self.run_with_sudo(['apt-get', 'install', '-y', 'software-properties-common'])
+                    self.run_with_sudo(['add-apt-repository', '-y', 'ppa:deadsnakes/ppa'])
+                
+                # Update package lists
+                print("   Updating package lists...")
+                self.run_with_sudo(['apt-get', 'update'])
+                
+                # Install packages
+                print(f"   Installing {len(install_packages)} packages...")
+                self.run_with_sudo(['apt-get', 'install', '-y'] + install_packages)
+                
+            elif pkg_manager in ['yum', 'dnf']:
+                # Update package lists
+                print("   Updating package lists...")
+                self.run_with_sudo([pkg_manager, 'update', '-y'])
+                
+                # Install packages
+                print(f"   Installing {len(install_packages)} packages...")
+                self.run_with_sudo([pkg_manager, 'install', '-y'] + install_packages)
+            
+            self.fixes_applied.append("System packages")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error installing packages: {e}")
+            self.fixes_failed.append("System packages")
+            return False
+    
+    def fix_virtual_environment(self) -> bool:
+        """Fix virtual environment issues."""
+        print("\n🔧 Fixing virtual environment...")
+        
+        venv_path = Path("venv")
+        
+        # Remove existing broken venv
+        if venv_path.exists():
+            print("   Removing existing virtual environment...")
+            shutil.rmtree(venv_path, ignore_errors=True)
+        
+        # Try different Python executables
+        python_executables = ['python3.13', 'python3', 'python']
+        python_exe = None
+        
+        for exe in python_executables:
+            if shutil.which(exe):
+                # Check version
+                result = subprocess.run([exe, '--version'], capture_output=True, text=True)
+                if result.returncode == 0:
+                    version = result.stdout.strip()
+                    if '3.13' in version or '3.12' in version or '3.11' in version or '3.10' in version or '3.9' in version or '3.8' in version:
+                        python_exe = exe
+                        print(f"   Using {exe} ({version})")
+                        break
+        
+        if not python_exe:
+            print("❌ No suitable Python version found")
+            self.fixes_failed.append("Virtual environment")
+            return False
+        
+        # Method 1: Standard venv creation
+        try:
+            print("   Creating virtual environment...")
+            result = subprocess.run([python_exe, '-m', 'venv', 'venv'], capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                # Verify pip works
+                venv_python = venv_path / ('Scripts/python.exe' if platform.system() == 'Windows' else 'bin/python')
+                
+                # Upgrade pip
+                print("   Upgrading pip...")
+                upgrade_result = subprocess.run([str(venv_python), '-m', 'pip', 'install', '--upgrade', 'pip'], 
+                                              capture_output=True, text=True)
+                
+                if upgrade_result.returncode == 0:
+                    self.fixes_applied.append("Virtual environment")
+                    return True
+                else:
+                    # Try bootstrapping pip
+                    return self._bootstrap_pip_in_venv()
+            else:
+                # Try without pip
+                return self._create_venv_without_pip(python_exe)
+                
+        except Exception as e:
+            print(f"   Error: {e}")
+            return self._create_venv_without_pip(python_exe)
+    
+    def _create_venv_without_pip(self, python_exe: str) -> bool:
+        """Create venv without pip and bootstrap it."""
+        print("   Creating virtual environment without pip...")
+        
+        try:
+            # Create venv without pip
+            result = subprocess.run([python_exe, '-m', 'venv', 'venv', '--without-pip'], 
+                                  capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                print("❌ Failed to create virtual environment")
+                self.fixes_failed.append("Virtual environment")
+                return False
+            
+            # Bootstrap pip
+            return self._bootstrap_pip_in_venv()
+            
+        except Exception as e:
+            print(f"❌ Error creating venv: {e}")
+            self.fixes_failed.append("Virtual environment")
+            return False
+    
+    def _bootstrap_pip_in_venv(self) -> bool:
+        """Bootstrap pip in the virtual environment."""
+        print("   Bootstrapping pip...")
+        
+        try:
+            # Download get-pip.py
+            get_pip_url = 'https://bootstrap.pypa.io/get-pip.py'
+            get_pip_path = 'get-pip.py'
+            
+            print("   Downloading get-pip.py...")
+            urllib.request.urlretrieve(get_pip_url, get_pip_path)
+            
+            # Install pip in venv
+            venv_python = Path("venv") / ('Scripts/python.exe' if platform.system() == 'Windows' else 'bin/python')
+            
+            print("   Installing pip in virtual environment...")
+            result = subprocess.run([str(venv_python), get_pip_path], capture_output=True, text=True)
+            
+            # Clean up
+            os.unlink(get_pip_path)
+            
+            if result.returncode == 0:
+                self.fixes_applied.append("Virtual environment")
+                return True
+            else:
+                print(f"❌ Failed to install pip: {result.stderr}")
+                self.fixes_failed.append("Virtual environment")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error bootstrapping pip: {e}")
+            self.fixes_failed.append("Virtual environment")
+            # Clean up
+            try:
+                os.unlink('get-pip.py')
+            except:
+                pass
+            return False
+    
+    def fix_permissions(self) -> bool:
+        """Fix file and directory permissions."""
+        if platform.system() == "Windows":
+            # Windows doesn't need permission fixes
+            return True
+        
+        print("\n🔧 Fixing permissions...")
+        
+        try:
+            # Fix .env permissions
+            env_file = Path(".env")
+            if env_file.exists():
+                print("   Setting .env permissions to 600...")
+                os.chmod(env_file, stat.S_IRUSR | stat.S_IWUSR)
+            
+            # Fix logs directory
+            logs_dir = Path("logs")
+            if not logs_dir.exists():
+                print("   Creating logs directory...")
+                logs_dir.mkdir(mode=0o755)
+            else:
+                print("   Setting logs directory permissions...")
+                os.chmod(logs_dir, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+            
+            # Fix venv permissions
+            venv_path = Path("venv")
+            if venv_path.exists():
+                print("   Fixing virtual environment permissions...")
+                # Make all files in venv executable if needed
+                for file in venv_path.rglob("*"):
+                    if file.is_file() and file.suffix in ['', '.exe']:
+                        try:
+                            current_perms = file.stat().st_mode
+                            if not (current_perms & stat.S_IXUSR):
+                                os.chmod(file, current_perms | stat.S_IXUSR)
+                        except:
+                            pass
+            
+            self.fixes_applied.append("Permissions")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error fixing permissions: {e}")
+            self.fixes_failed.append("Permissions")
+            return False
+    
+    def fix_environment(self) -> bool:
+        """Fix environment configuration."""
+        print("\n🔧 Fixing environment configuration...")
+        
+        try:
+            # Set UTF-8 locale
+            os.environ['LC_ALL'] = 'C.UTF-8'
+            os.environ['LANG'] = 'C.UTF-8'
+            os.environ['PYTHONIOENCODING'] = 'utf-8'
+            
+            # Clear pip cache if needed
+            print("   Clearing pip cache...")
+            cache_dir = Path.home() / '.cache' / 'pip'
+            if cache_dir.exists():
+                shutil.rmtree(cache_dir, ignore_errors=True)
+            
+            # Check for proxy
+            proxy = os.environ.get('HTTP_PROXY') or os.environ.get('http_proxy')
+            if proxy:
+                print(f"   Detected proxy: {proxy}")
+                os.environ['HTTPS_PROXY'] = proxy
+                os.environ['https_proxy'] = proxy
+            
+            # Create .env from example if not exists
+            env_file = Path(".env")
+            env_example = Path(".env.example")
+            
+            if not env_file.exists() and env_example.exists():
+                print("   Creating .env from .env.example...")
+                shutil.copy(env_example, env_file)
+                # Set proper permissions
+                if platform.system() != "Windows":
+                    os.chmod(env_file, stat.S_IRUSR | stat.S_IWUSR)
+            
+            self.fixes_applied.append("Environment")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error fixing environment: {e}")
+            self.fixes_failed.append("Environment")
+            return False
+    
+    def run_auto_fix(self, fix_types: Optional[List[str]] = None) -> bool:
+        """Run auto-fix for specified types or all if none specified."""
+        print("\n" + "="*80)
+        print("🔧 WAZUH MCP AUTO-FIX")
+        print("="*80)
+        
+        if not fix_types:
+            fix_types = ['packages', 'venv', 'permissions', 'environment']
+        
+        # Map fix types to methods
+        fix_methods = {
+            'packages': self.fix_system_packages,
+            'venv': self.fix_virtual_environment,
+            'permissions': self.fix_permissions,
+            'environment': self.fix_environment
+        }
+        
+        # Run fixes
+        for fix_type in fix_types:
+            if fix_type in fix_methods:
+                fix_methods[fix_type]()
+        
+        # Print summary
+        print("\n" + "="*80)
+        print("📊 AUTO-FIX SUMMARY")
+        print("="*80)
+        
+        if self.fixes_applied:
+            print("\n✅ Successfully fixed:")
+            for fix in self.fixes_applied:
+                print(f"   • {fix}")
+        
+        if self.fixes_failed:
+            print("\n❌ Failed to fix:")
+            for fix in self.fixes_failed:
+                print(f"   • {fix}")
+        
+        if not self.fixes_failed:
+            print("\n✅ All fixes completed successfully!")
+            print("🚀 Run 'python install.py' to continue with installation")
+        else:
+            print("\n⚠️  Some fixes failed. Manual intervention may be required.")
+        
+        return len(self.fixes_failed) == 0
+
+
 def generate_deployment_report(results: Dict[str, bool]):
     """Generate a comprehensive deployment report."""
     print_section("DEPLOYMENT REPORT")
@@ -796,15 +1219,44 @@ def generate_deployment_report(results: Dict[str, bool]):
 
 def main():
     """Main validation function with comprehensive production readiness assessment."""
-    # Set up console encoding for Windows
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Validate and fix Wazuh MCP Server setup')
+    parser.add_argument('--fix', action='store_true', help='Automatically fix detected issues')
+    parser.add_argument('--fix-only', type=str, help='Fix only specific types (comma-separated: packages,venv,permissions,environment)')
+    parser.add_argument('--non-interactive', action='store_true', help='Run in non-interactive mode')
+    args = parser.parse_args()
+    
+    # Set up console encoding for Windows - MOVED BEFORE ANY PRINT OPERATIONS
     if platform.system() == "Windows":
         try:
-            # Try to set UTF-8 encoding for Windows console
+            # Set console to UTF-8 first
+            import subprocess
+            subprocess.run(['chcp', '65001'], capture_output=True, shell=True)
+            
+            # Then try to set UTF-8 encoding for Python stdout/stderr
             import codecs
-            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'replace')
-            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'replace')
+            # Store original stdout/stderr in case we need to restore
+            original_stdout = sys.stdout
+            original_stderr = sys.stderr
+            
+            try:
+                sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'replace')
+                sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'replace')
+                
+                # Test if the encoding setup works by checking unicode support
+                test_unicode = _supports_unicode()
+                if not test_unicode:
+                    # Restore original if Unicode test fails
+                    sys.stdout = original_stdout
+                    sys.stderr = original_stderr
+                    
+            except Exception:
+                # Restore original on any error
+                sys.stdout = original_stdout
+                sys.stderr = original_stderr
+                
         except Exception:
-            # If that fails, we'll use ASCII fallbacks in the print functions
+            # If any console setup fails, continue with defaults
             pass
     
     print_header()
@@ -873,6 +1325,50 @@ def main():
         json.dump(report_data, f, indent=2)
     
     print(f"\n📊 Validation report saved to: {report_file}")
+    
+    # Run auto-fix if requested
+    if args.fix or args.fix_only:
+        # Only run on Linux/macOS
+        if platform.system() == "Windows":
+            print("\n❌ Auto-fix is not supported on Windows. Please fix issues manually.")
+            return 1
+        
+        # Determine which fixes to run
+        fix_types = None
+        if args.fix_only:
+            fix_types = [t.strip() for t in args.fix_only.split(',')]
+        
+        # Create auto-fixer
+        fixer = AutoFixer(interactive=not args.non_interactive)
+        
+        # Identify fixable issues
+        fixable_issues = []
+        if not results.get("Virtual Environment", True):
+            fixable_issues.append("venv")
+        if not results.get("System Information", True):
+            fixable_issues.append("packages")
+        if not results.get("Configuration", True) or not results.get("Logs Directory", True):
+            fixable_issues.append("permissions")
+            fixable_issues.append("environment")
+        
+        if fixable_issues and (args.fix or args.fix_only):
+            print(f"\n🔍 Found fixable issues: {', '.join(fixable_issues)}")
+            
+            if args.fix_only:
+                # Use specified fixes
+                fix_success = fixer.run_auto_fix(fix_types)
+            else:
+                # Fix all detected issues
+                fix_success = fixer.run_auto_fix(fixable_issues)
+            
+            if fix_success:
+                print("\n✅ Auto-fix completed. Re-running validation...")
+                # Re-run validation after fixes
+                # Note: In a real implementation, you might want to recursively call main()
+                # or refactor the validation logic into a separate function
+                return 0
+            else:
+                return 1
     
     return 0 if deployment_ready else 1
 

@@ -226,7 +226,7 @@ class WazuhConfig(BaseModel):
                 port=int(os.getenv("WAZUH_PORT", "55000")),
                 username=os.getenv("WAZUH_USER"),
                 password=os.getenv("WAZUH_PASS"),
-                verify_ssl=cls._parse_bool(os.getenv("VERIFY_SSL", "false")),
+                verify_ssl=cls._parse_bool(os.getenv("VERIFY_SSL", "true")),
                 api_version=os.getenv("WAZUH_API_VERSION", "v4"),
                 
                 # Indexer API settings

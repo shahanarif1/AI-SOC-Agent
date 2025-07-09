@@ -314,8 +314,9 @@ def supports_color_output() -> bool:
         # Windows 10 version 1511 and later support ANSI escape sequences
         try:
             import subprocess
+            # Use shell=False and provide command as list for security
             result = subprocess.run(
-                ["ver"], capture_output=True, text=True, shell=True
+                ["cmd", "/c", "ver"], capture_output=True, text=True, shell=False
             )
             if "10." in result.stdout or "11." in result.stdout:
                 return True

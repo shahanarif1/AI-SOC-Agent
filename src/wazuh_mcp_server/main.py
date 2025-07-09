@@ -149,6 +149,157 @@ class WazuhMCPServer:
                 )
             ]
         
+        @self.server.list_prompts()
+        async def handle_list_prompts() -> list[types.Prompt]:
+            """List available security analysis prompts."""
+            return [
+                types.Prompt(
+                    name="security-incident-analysis",
+                    description="Analyze a security incident from Wazuh alerts with comprehensive investigation steps",
+                    arguments=[
+                        types.PromptArgument(
+                            name="alert_id",
+                            description="The ID of the alert to analyze",
+                            required=True
+                        ),
+                        types.PromptArgument(
+                            name="include_context",
+                            description="Include surrounding context and related alerts",
+                            required=False
+                        )
+                    ]
+                ),
+                types.Prompt(
+                    name="threat-hunting-query",
+                    description="Generate threat hunting queries based on IOCs and attack patterns",
+                    arguments=[
+                        types.PromptArgument(
+                            name="threat_type",
+                            description="Type of threat to hunt for (malware, intrusion, data_exfiltration, etc.)",
+                            required=True
+                        ),
+                        types.PromptArgument(
+                            name="time_range",
+                            description="Time range for the hunt (e.g., '24h', '7d', '30d')",
+                            required=False
+                        ),
+                        types.PromptArgument(
+                            name="target_agents",
+                            description="Specific agents to focus on (comma-separated IDs)",
+                            required=False
+                        )
+                    ]
+                ),
+                types.Prompt(
+                    name="compliance-assessment",
+                    description="Perform a comprehensive compliance assessment against security frameworks",
+                    arguments=[
+                        types.PromptArgument(
+                            name="framework",
+                            description="Compliance framework (pci_dss, hipaa, gdpr, nist, iso27001)",
+                            required=True
+                        ),
+                        types.PromptArgument(
+                            name="scope",
+                            description="Assessment scope (full, critical_controls, specific_section)",
+                            required=False
+                        )
+                    ]
+                ),
+                types.Prompt(
+                    name="security-report-generation",
+                    description="Generate executive security reports with recommendations",
+                    arguments=[
+                        types.PromptArgument(
+                            name="report_type",
+                            description="Type of report (executive, technical, compliance, incident)",
+                            required=True
+                        ),
+                        types.PromptArgument(
+                            name="time_period",
+                            description="Reporting period (daily, weekly, monthly, quarterly)",
+                            required=False
+                        ),
+                        types.PromptArgument(
+                            name="audience",
+                            description="Target audience (executives, security_team, compliance_team)",
+                            required=False
+                        )
+                    ]
+                ),
+                types.Prompt(
+                    name="vulnerability-prioritization",
+                    description="Prioritize vulnerabilities based on risk, exploitability, and business impact",
+                    arguments=[
+                        types.PromptArgument(
+                            name="severity_threshold",
+                            description="Minimum severity level (low, medium, high, critical)",
+                            required=False
+                        ),
+                        types.PromptArgument(
+                            name="asset_criticality",
+                            description="Focus on assets with specific criticality (low, medium, high, critical)",
+                            required=False
+                        )
+                    ]
+                ),
+                types.Prompt(
+                    name="forensic-analysis",
+                    description="Perform forensic analysis of security incidents with timeline reconstruction",
+                    arguments=[
+                        types.PromptArgument(
+                            name="incident_id",
+                            description="Incident identifier or alert ID to investigate",
+                            required=True
+                        ),
+                        types.PromptArgument(
+                            name="analysis_depth",
+                            description="Depth of analysis (surface, detailed, comprehensive)",
+                            required=False
+                        )
+                    ]
+                )
+            ]
+        
+        @self.server.get_prompt()
+        async def handle_get_prompt(name: str, arguments: dict) -> types.GetPromptResult:
+            """Get specific security analysis prompt with context."""
+            request_id = str(uuid.uuid4())
+            
+            try:
+                with LogContext(request_id):
+                    self.logger.info(f"Generating prompt: {name}", extra={"details": arguments})
+                    
+                    if name == "security-incident-analysis":
+                        return await self._get_security_incident_analysis_prompt(arguments)
+                    elif name == "threat-hunting-query":
+                        return await self._get_threat_hunting_query_prompt(arguments)
+                    elif name == "compliance-assessment":
+                        return await self._get_compliance_assessment_prompt(arguments)
+                    elif name == "security-report-generation":
+                        return await self._get_security_report_generation_prompt(arguments)
+                    elif name == "vulnerability-prioritization":
+                        return await self._get_vulnerability_prioritization_prompt(arguments)
+                    elif name == "forensic-analysis":
+                        return await self._get_forensic_analysis_prompt(arguments)
+                    else:
+                        raise ValueError(f"Unknown prompt: {name}")
+                        
+            except Exception as e:
+                self.logger.error(f"Error generating prompt {name}: {str(e)}")
+                return types.GetPromptResult(
+                    description=f"Error generating prompt: {str(e)}",
+                    messages=[
+                        types.PromptMessage(
+                            role="user",
+                            content=types.TextContent(
+                                type="text",
+                                text=f"Error: {str(e)}"
+                            )
+                        )
+                    ]
+                )
+        
         @self.server.read_resource()
         async def handle_read_resource(uri: str) -> str:
             """Read specific Wazuh resource with comprehensive error handling."""
@@ -506,6 +657,11 @@ class WazuhMCPServer:
             agent_id=arguments.get("agent_id")
         )
         
+        # Check for critical alerts and send notifications
+        alerts = data.get("data", {}).get("affected_items", [])
+        for alert in alerts:
+            await self._send_critical_alert_notification(alert)
+        
         formatted = self._format_alerts(data)
         
         return [types.TextContent(
@@ -729,7 +885,14 @@ class WazuhMCPServer:
         time_window_hours = arguments.get("time_window_hours", 24)
         include_vulnerabilities = arguments.get("include_vulnerabilities", True)
         
-        # Get alerts for the time window
+        # Initialize progress tracking
+        total_steps = 4 if include_vulnerabilities else 2
+        current_step = 0
+        
+        # Step 1: Get alerts for the time window
+        current_step += 1
+        await self._report_progress(current_step, total_steps, "Fetching security alerts...")
+        
         time_range_seconds = time_window_hours * 3600
         alerts_data = await self.api_client.get_alerts(
             limit=2000, 
@@ -739,22 +902,43 @@ class WazuhMCPServer:
         
         vulnerabilities = []
         if include_vulnerabilities:
-            # Get sample of vulnerabilities
+            # Step 2: Get agents
+            current_step += 1
+            await self._report_progress(current_step, total_steps, "Fetching agent information...")
+            
             agents_data = await self.api_client.get_agents(status="active")
             active_agents = agents_data.get("data", {}).get("affected_items", [])[:10]  # Sample 10 agents
             
-            for agent in active_agents:
+            # Step 3: Get vulnerabilities
+            current_step += 1
+            await self._report_progress(current_step, total_steps, "Analyzing vulnerabilities...")
+            
+            for i, agent in enumerate(active_agents):
                 try:
                     vuln_data = await self.api_client.get_agent_vulnerabilities(agent["id"])
                     agent_vulns = vuln_data.get("data", {}).get("affected_items", [])
                     vulnerabilities.extend(agent_vulns)
+                    
+                    # Report sub-progress
+                    if i % 2 == 0:  # Report every 2nd agent
+                        await self._report_progress(
+                            current_step, 
+                            total_steps, 
+                            f"Analyzing vulnerabilities... ({i+1}/{len(active_agents)} agents processed)"
+                        )
                 except Exception as e:
                     self.logger.warning(f"Could not get vulnerabilities for agent {agent['id']}: {str(e)}")
         
-        # Perform comprehensive risk assessment
+        # Final step: Perform comprehensive risk assessment
+        current_step += 1
+        await self._report_progress(current_step, total_steps, "Calculating risk assessment...")
+        
         risk_assessment = self.security_analyzer.calculate_comprehensive_risk_score(
             alerts, vulnerabilities, time_window_hours
         )
+        
+        # Complete progress
+        await self._report_progress(total_steps, total_steps, "Risk assessment completed!")
         
         # Format result
         result = {
@@ -1111,6 +1295,725 @@ class WazuhMCPServer:
             "analysis_window": "Last hour",
             "timestamp": datetime.utcnow().isoformat()
         }
+    
+    async def _get_security_incident_analysis_prompt(self, arguments: dict) -> types.GetPromptResult:
+        """Generate security incident analysis prompt with context."""
+        alert_id = arguments.get("alert_id")
+        include_context = arguments.get("include_context", "true").lower() == "true"
+        
+        # Fetch alert data for context
+        context_data = ""
+        if alert_id:
+            try:
+                alerts_data = await self.api_client.get_alerts(limit=100)
+                alerts = alerts_data.get("data", {}).get("affected_items", [])
+                target_alert = next((a for a in alerts if str(a.get("id")) == str(alert_id)), None)
+                
+                if target_alert:
+                    context_data = f"""
+### Alert Details:
+- **ID**: {target_alert.get('id')}
+- **Timestamp**: {target_alert.get('timestamp')}
+- **Rule**: {target_alert.get('rule', {}).get('description')} (Level: {target_alert.get('rule', {}).get('level')})
+- **Agent**: {target_alert.get('agent', {}).get('name')} ({target_alert.get('agent', {}).get('ip')})
+- **Location**: {target_alert.get('location')}
+"""
+                    
+                    if include_context:
+                        # Get related alerts
+                        agent_id = target_alert.get('agent', {}).get('id')
+                        related_alerts = [a for a in alerts if a.get('agent', {}).get('id') == agent_id and a.get('id') != alert_id][:5]
+                        
+                        if related_alerts:
+                            context_data += "\n### Related Alerts on Same Agent:\n"
+                            for alert in related_alerts:
+                                context_data += f"- {alert.get('timestamp')}: {alert.get('rule', {}).get('description')} (Level: {alert.get('rule', {}).get('level')})\n"
+                else:
+                    context_data = f"\n### Alert ID {alert_id} not found in recent alerts."
+            except Exception as e:
+                context_data = f"\n### Error fetching alert context: {str(e)}"
+        
+        prompt_text = f"""You are a cybersecurity analyst investigating a security incident from Wazuh SIEM. Please analyze the following security alert and provide a comprehensive incident analysis.
+
+{context_data}
+
+### Analysis Framework:
+Please provide a structured analysis covering:
+
+1. **Incident Summary**
+   - Brief description of what happened
+   - Severity assessment and business impact
+   - Initial classification (malware, intrusion, policy violation, etc.)
+
+2. **Technical Analysis**
+   - Detailed breakdown of the alert and its indicators
+   - Attack vectors and techniques used (map to MITRE ATT&CK if applicable)
+   - Affected systems and potential lateral movement
+
+3. **Timeline Reconstruction**
+   - Chronological sequence of events
+   - Key timestamps and their significance
+   - Potential attack progression
+
+4. **Risk Assessment**
+   - Immediate risks and threats
+   - Potential for further compromise
+   - Business impact evaluation
+
+5. **Containment Recommendations**
+   - Immediate actions to contain the threat
+   - Isolation procedures for affected systems
+   - Evidence preservation steps
+
+6. **Investigation Steps**
+   - Additional data sources to examine
+   - Forensic artifacts to collect
+   - Queries to run for deeper analysis
+
+7. **Remediation Plan**
+   - Step-by-step remediation actions
+   - System hardening recommendations
+   - Prevention measures for future incidents
+
+Please provide actionable insights and prioritize recommendations based on risk level."""
+
+        return types.GetPromptResult(
+            description="Comprehensive security incident analysis with investigation framework",
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(
+                        type="text",
+                        text=prompt_text
+                    )
+                )
+            ]
+        )
+    
+    async def _get_threat_hunting_query_prompt(self, arguments: dict) -> types.GetPromptResult:
+        """Generate threat hunting query prompt."""
+        threat_type = arguments.get("threat_type", "general")
+        time_range = arguments.get("time_range", "24h")
+        target_agents = arguments.get("target_agents", "")
+        
+        # Get recent alerts for context
+        context_data = ""
+        try:
+            alerts_data = await self.api_client.get_alerts(limit=50)
+            alerts = alerts_data.get("data", {}).get("affected_items", [])
+            
+            if alerts:
+                # Analyze recent threat patterns
+                rule_counts = {}
+                for alert in alerts:
+                    rule_desc = alert.get('rule', {}).get('description', 'Unknown')
+                    rule_counts[rule_desc] = rule_counts.get(rule_desc, 0) + 1
+                
+                top_rules = sorted(rule_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+                context_data = f"""
+### Recent Threat Landscape (Last 50 alerts):
+{chr(10).join([f"- {rule}: {count} occurrences" for rule, count in top_rules])}
+"""
+        except Exception as e:
+            context_data = f"\n### Error fetching threat context: {str(e)}"
+        
+        prompt_text = f"""You are a threat hunter developing proactive hunting queries for a Wazuh SIEM environment. Generate comprehensive threat hunting queries and strategies.
+
+### Hunting Parameters:
+- **Threat Type**: {threat_type}
+- **Time Range**: {time_range}
+- **Target Agents**: {target_agents if target_agents else "All agents"}
+
+{context_data}
+
+### Generate Threat Hunting Strategy:
+
+1. **Threat Hypothesis**
+   - What specific threats are we hunting for?
+   - Threat actor behaviors and TTPs to look for
+   - MITRE ATT&CK techniques to focus on
+
+2. **Hunting Queries**
+   - Specific Wazuh queries to identify suspicious activity
+   - Log sources and data types to examine
+   - Correlation rules to create or modify
+
+3. **Indicators of Compromise (IOCs)**
+   - File hashes, IP addresses, domains to investigate
+   - Process names and command line patterns
+   - Network traffic patterns and anomalies
+
+4. **Behavioral Analysis**
+   - User behavior anomalies to detect
+   - System behavior patterns that indicate compromise
+   - Temporal patterns and frequency analysis
+
+5. **Detection Logic**
+   - Boolean logic for combining indicators
+   - Thresholds and baselines for anomaly detection
+   - Statistical analysis approaches
+
+6. **Validation Steps**
+   - How to validate potential findings
+   - False positive reduction techniques
+   - Escalation criteria for confirmed threats
+
+7. **Automation Opportunities**
+   - Automated hunting rules to implement
+   - Orchestration and response workflows
+   - Continuous monitoring improvements
+
+Please provide actionable hunting queries and methodologies tailored to the {threat_type} threat landscape."""
+
+        return types.GetPromptResult(
+            description="Comprehensive threat hunting strategy and query generation",
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(
+                        type="text",
+                        text=prompt_text
+                    )
+                )
+            ]
+        )
+    
+    async def _get_compliance_assessment_prompt(self, arguments: dict) -> types.GetPromptResult:
+        """Generate compliance assessment prompt."""
+        framework = arguments.get("framework", "pci_dss")
+        scope = arguments.get("scope", "full")
+        
+        # Get system context
+        context_data = ""
+        try:
+            agents_data = await self.api_client.get_agents()
+            agents = agents_data.get("data", {}).get("affected_items", [])
+            
+            alerts_data = await self.api_client.get_alerts(limit=100)
+            alerts = alerts_data.get("data", {}).get("affected_items", [])
+            
+            context_data = f"""
+### Current Environment Status:
+- **Total Agents**: {len(agents)}
+- **Active Agents**: {len([a for a in agents if a.get('status') == 'active'])}
+- **Recent Alerts**: {len(alerts)}
+- **High Severity Alerts**: {len([a for a in alerts if a.get('rule', {}).get('level', 0) >= 10])}
+"""
+        except Exception as e:
+            context_data = f"\n### Error fetching environment context: {str(e)}"
+        
+        framework_details = {
+            "pci_dss": {
+                "name": "Payment Card Industry Data Security Standard",
+                "focus": "protecting cardholder data",
+                "key_areas": ["network security", "access control", "monitoring", "encryption"]
+            },
+            "hipaa": {
+                "name": "Health Insurance Portability and Accountability Act",
+                "focus": "protecting healthcare information",
+                "key_areas": ["administrative safeguards", "physical safeguards", "technical safeguards"]
+            },
+            "gdpr": {
+                "name": "General Data Protection Regulation",
+                "focus": "data privacy and protection",
+                "key_areas": ["data processing", "consent", "breach notification", "data subject rights"]
+            },
+            "nist": {
+                "name": "NIST Cybersecurity Framework",
+                "focus": "cybersecurity risk management",
+                "key_areas": ["identify", "protect", "detect", "respond", "recover"]
+            },
+            "iso27001": {
+                "name": "ISO 27001 Information Security Management",
+                "focus": "information security management systems",
+                "key_areas": ["risk assessment", "security controls", "monitoring", "improvement"]
+            }
+        }
+        
+        framework_info = framework_details.get(framework, framework_details["pci_dss"])
+        
+        prompt_text = f"""You are a compliance officer conducting a comprehensive assessment against {framework_info['name']} standards. Analyze the current security posture and provide detailed compliance recommendations.
+
+### Assessment Parameters:
+- **Framework**: {framework_info['name']}
+- **Scope**: {scope}
+- **Focus Area**: {framework_info['focus']}
+- **Key Areas**: {', '.join(framework_info['key_areas'])}
+
+{context_data}
+
+### Compliance Assessment Framework:
+
+1. **Current Compliance Status**
+   - Overall compliance posture assessment
+   - Strengths and weaknesses identification
+   - Gap analysis against framework requirements
+
+2. **Control Assessment**
+   - Technical controls evaluation
+   - Administrative controls review
+   - Physical controls assessment (where applicable)
+
+3. **Risk Analysis**
+   - Compliance risks and their impact
+   - Regulatory penalties and consequences
+   - Business risks from non-compliance
+
+4. **Evidence Collection**
+   - Required documentation and evidence
+   - Audit trail and logging requirements
+   - Monitoring and reporting mechanisms
+
+5. **Remediation Roadmap**
+   - Prioritized action items
+   - Timeline and resource requirements
+   - Quick wins and long-term improvements
+
+6. **Monitoring and Maintenance**
+   - Continuous compliance monitoring
+   - Regular assessment schedules
+   - Key performance indicators (KPIs)
+
+7. **Reporting and Documentation**
+   - Compliance report structure
+   - Stakeholder communication
+   - Audit preparation guidance
+
+Please provide a detailed compliance assessment with actionable recommendations prioritized by risk and regulatory importance."""
+
+        return types.GetPromptResult(
+            description=f"Comprehensive {framework_info['name']} compliance assessment",
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(
+                        type="text",
+                        text=prompt_text
+                    )
+                )
+            ]
+        )
+    
+    async def _get_security_report_generation_prompt(self, arguments: dict) -> types.GetPromptResult:
+        """Generate security report generation prompt."""
+        report_type = arguments.get("report_type", "executive")
+        time_period = arguments.get("time_period", "weekly")
+        audience = arguments.get("audience", "executives")
+        
+        # Get comprehensive metrics
+        context_data = ""
+        try:
+            # Get alerts for reporting period
+            time_range_map = {"daily": 86400, "weekly": 604800, "monthly": 2592000, "quarterly": 7776000}
+            time_range = time_range_map.get(time_period, 604800)
+            
+            alerts_data = await self.api_client.get_alerts(limit=1000, time_range=time_range)
+            alerts = alerts_data.get("data", {}).get("affected_items", [])
+            
+            agents_data = await self.api_client.get_agents()
+            agents = agents_data.get("data", {}).get("affected_items", [])
+            
+            # Calculate metrics
+            total_alerts = len(alerts)
+            high_severity = len([a for a in alerts if a.get('rule', {}).get('level', 0) >= 10])
+            critical_alerts = len([a for a in alerts if a.get('rule', {}).get('level', 0) >= 12])
+            
+            context_data = f"""
+### Security Metrics ({time_period.title()} Period):
+- **Total Alerts**: {total_alerts}
+- **High Severity Alerts**: {high_severity}
+- **Critical Alerts**: {critical_alerts}
+- **Total Agents**: {len(agents)}
+- **Active Agents**: {len([a for a in agents if a.get('status') == 'active'])}
+- **Agent Coverage**: {len([a for a in agents if a.get('status') == 'active']) / len(agents) * 100 if agents else 0:.1f}%
+"""
+        except Exception as e:
+            context_data = f"\n### Error fetching metrics: {str(e)}"
+        
+        audience_details = {
+            "executives": {
+                "focus": "business impact, risk levels, and strategic recommendations",
+                "style": "high-level, business-focused, with executive summary"
+            },
+            "security_team": {
+                "focus": "technical details, incident analysis, and operational metrics",
+                "style": "detailed technical analysis with actionable insights"
+            },
+            "compliance_team": {
+                "focus": "regulatory compliance, audit findings, and control effectiveness",
+                "style": "compliance-focused with regulatory mapping"
+            }
+        }
+        
+        audience_info = audience_details.get(audience, audience_details["executives"])
+        
+        prompt_text = f"""You are a security analyst generating a comprehensive {report_type} security report for {audience}. Create a professional, actionable report that communicates security posture effectively.
+
+### Report Parameters:
+- **Report Type**: {report_type.title()}
+- **Time Period**: {time_period.title()}
+- **Target Audience**: {audience.title()}
+- **Focus**: {audience_info['focus']}
+- **Style**: {audience_info['style']}
+
+{context_data}
+
+### Security Report Structure:
+
+1. **Executive Summary**
+   - Key findings and security posture overview
+   - Critical issues requiring immediate attention
+   - Overall risk assessment and trending
+
+2. **Threat Landscape Analysis**
+   - Attack patterns and threat actor activity
+   - Emerging threats and vulnerabilities
+   - Industry-specific threat intelligence
+
+3. **Incident Analysis**
+   - Significant security incidents and their impact
+   - Response effectiveness and lessons learned
+   - Trend analysis and pattern recognition
+
+4. **Metrics and KPIs**
+   - Security operations metrics
+   - Incident response performance
+   - Compliance and audit metrics
+
+5. **Risk Assessment**
+   - Current risk levels and classifications
+   - Risk trend analysis
+   - Mitigation effectiveness
+
+6. **Recommendations**
+   - Strategic security improvements
+   - Tactical operational enhancements
+   - Resource and investment priorities
+
+7. **Appendices**
+   - Detailed technical findings
+   - Compliance mapping
+   - Methodology and data sources
+
+Please generate a comprehensive, professional security report that is appropriate for the {audience} audience and provides actionable insights for improving security posture."""
+
+        return types.GetPromptResult(
+            description=f"Professional {report_type} security report for {audience}",
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(
+                        type="text",
+                        text=prompt_text
+                    )
+                )
+            ]
+        )
+    
+    async def _get_vulnerability_prioritization_prompt(self, arguments: dict) -> types.GetPromptResult:
+        """Generate vulnerability prioritization prompt."""
+        severity_threshold = arguments.get("severity_threshold", "medium")
+        asset_criticality = arguments.get("asset_criticality", "high")
+        
+        # Get vulnerability data
+        context_data = ""
+        try:
+            agents_data = await self.api_client.get_agents(status="active")
+            agents = agents_data.get("data", {}).get("affected_items", [])[:10]  # Sample 10 agents
+            
+            total_vulns = 0
+            critical_vulns = 0
+            high_vulns = 0
+            
+            for agent in agents:
+                try:
+                    vuln_data = await self.api_client.get_agent_vulnerabilities(agent["id"])
+                    vulns = vuln_data.get("data", {}).get("affected_items", [])
+                    total_vulns += len(vulns)
+                    
+                    for vuln in vulns:
+                        severity = vuln.get("severity", "").lower()
+                        if severity == "critical":
+                            critical_vulns += 1
+                        elif severity == "high":
+                            high_vulns += 1
+                except Exception:
+                    continue
+            
+            context_data = f"""
+### Vulnerability Landscape:
+- **Total Vulnerabilities**: {total_vulns}
+- **Critical Vulnerabilities**: {critical_vulns}
+- **High Vulnerabilities**: {high_vulns}
+- **Agents Analyzed**: {len(agents)}
+"""
+        except Exception as e:
+            context_data = f"\n### Error fetching vulnerability data: {str(e)}"
+        
+        prompt_text = f"""You are a vulnerability management specialist developing a risk-based prioritization strategy for security vulnerabilities. Create a comprehensive framework for prioritizing remediation efforts.
+
+### Prioritization Parameters:
+- **Severity Threshold**: {severity_threshold}
+- **Asset Criticality**: {asset_criticality}
+- **Risk-Based Approach**: Business impact and exploitability focus
+
+{context_data}
+
+### Vulnerability Prioritization Framework:
+
+1. **Risk Scoring Matrix**
+   - CVSS score integration with business context
+   - Threat intelligence and exploit availability
+   - Asset criticality and business impact weighting
+
+2. **Threat Context Analysis**
+   - Active exploitation in the wild
+   - Threat actor capabilities and intentions
+   - Industry-specific threat landscape
+
+3. **Business Impact Assessment**
+   - Critical business processes affected
+   - Data sensitivity and regulatory implications
+   - Financial and operational impact potential
+
+4. **Remediation Feasibility**
+   - Patch availability and testing requirements
+   - System dependencies and change windows
+   - Resource requirements and technical complexity
+
+5. **Compensating Controls**
+   - Existing security controls effectiveness
+   - Network segmentation and access controls
+   - Monitoring and detection capabilities
+
+6. **Prioritization Methodology**
+   - Scoring algorithm and weighting factors
+   - Decision matrices and automated scoring
+   - Regular re-evaluation criteria
+
+7. **Remediation Roadmap**
+   - Immediate actions (0-30 days)
+   - Short-term remediation (1-3 months)
+   - Long-term strategic improvements (3-12 months)
+
+8. **Metrics and Tracking**
+   - Key performance indicators
+   - Remediation progress tracking
+   - Risk reduction measurement
+
+Please provide a comprehensive vulnerability prioritization strategy that balances technical risk with business impact and operational constraints."""
+
+        return types.GetPromptResult(
+            description="Risk-based vulnerability prioritization framework",
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(
+                        type="text",
+                        text=prompt_text
+                    )
+                )
+            ]
+        )
+    
+    async def _get_forensic_analysis_prompt(self, arguments: dict) -> types.GetPromptResult:
+        """Generate forensic analysis prompt."""
+        incident_id = arguments.get("incident_id")
+        analysis_depth = arguments.get("analysis_depth", "detailed")
+        
+        # Get incident context
+        context_data = ""
+        try:
+            # Try to fetch the specific incident/alert
+            alerts_data = await self.api_client.get_alerts(limit=200)
+            alerts = alerts_data.get("data", {}).get("affected_items", [])
+            
+            target_incident = None
+            if incident_id:
+                target_incident = next((a for a in alerts if str(a.get("id")) == str(incident_id)), None)
+            
+            if target_incident:
+                agent_id = target_incident.get('agent', {}).get('id')
+                agent_alerts = [a for a in alerts if a.get('agent', {}).get('id') == agent_id]
+                
+                context_data = f"""
+### Incident Context:
+- **Incident ID**: {incident_id}
+- **Timestamp**: {target_incident.get('timestamp')}
+- **Agent**: {target_incident.get('agent', {}).get('name')} ({target_incident.get('agent', {}).get('ip')})
+- **Rule**: {target_incident.get('rule', {}).get('description')}
+- **Severity**: Level {target_incident.get('rule', {}).get('level')}
+
+### Related Events on Same Agent:
+{chr(10).join([f"- {a.get('timestamp')}: {a.get('rule', {}).get('description')} (Level {a.get('rule', {}).get('level')})" for a in agent_alerts[:10]])}
+"""
+            else:
+                context_data = f"\n### Incident ID {incident_id} not found in recent alerts. Proceeding with general forensic analysis framework."
+        except Exception as e:
+            context_data = f"\n### Error fetching incident context: {str(e)}"
+        
+        analysis_levels = {
+            "surface": "high-level overview with key findings",
+            "detailed": "comprehensive analysis with technical details",
+            "comprehensive": "exhaustive examination with all available evidence"
+        }
+        
+        analysis_description = analysis_levels.get(analysis_depth, "detailed analysis")
+        
+        prompt_text = f"""You are a digital forensics investigator conducting a {analysis_description} of a security incident. Perform systematic forensic analysis to reconstruct the incident timeline and identify all relevant evidence.
+
+### Investigation Parameters:
+- **Incident ID**: {incident_id}
+- **Analysis Depth**: {analysis_depth.title()}
+- **Investigation Type**: {analysis_description}
+
+{context_data}
+
+### Forensic Analysis Framework:
+
+1. **Initial Assessment**
+   - Incident scope and affected systems
+   - Evidence preservation status
+   - Investigation objectives and priorities
+
+2. **Timeline Reconstruction**
+   - Chronological sequence of events
+   - Event correlation across systems
+   - Attack progression and lateral movement
+
+3. **Evidence Collection**
+   - Log files and system artifacts
+   - Network traffic analysis
+   - File system examination
+   - Memory dump analysis (if available)
+
+4. **Artifact Analysis**
+   - Malware analysis and IOC extraction
+   - User activity reconstruction
+   - System changes and modifications
+   - Network connections and data exfiltration
+
+5. **Attack Vector Analysis**
+   - Initial compromise method
+   - Privilege escalation techniques
+   - Persistence mechanisms
+   - Command and control communications
+
+6. **Attribution Assessment**
+   - Threat actor indicators
+   - Tactics, techniques, and procedures (TTPs)
+   - Campaign indicators and similarities
+   - Geolocation and infrastructure analysis
+
+7. **Impact Assessment**
+   - Data accessed or compromised
+   - System integrity status
+   - Business process disruption
+   - Regulatory and compliance implications
+
+8. **Recovery Recommendations**
+   - Evidence-based remediation steps
+   - System restoration procedures
+   - Security improvements
+   - Monitoring enhancements
+
+9. **Legal and Reporting**
+   - Chain of custody documentation
+   - Executive summary for stakeholders
+   - Legal implications and requirements
+   - Lessons learned and process improvements
+
+Please conduct a thorough forensic analysis that follows industry best practices and provides actionable insights for incident response and security improvement."""
+
+        return types.GetPromptResult(
+            description=f"Comprehensive {analysis_depth} forensic analysis of security incident",
+            messages=[
+                types.PromptMessage(
+                    role="user",
+                    content=types.TextContent(
+                        type="text",
+                        text=prompt_text
+                    )
+                )
+            ]
+        )
+    
+    async def _send_critical_alert_notification(self, alert: dict):
+        """Send notification for critical security alerts."""
+        try:
+            severity_level = alert.get('rule', {}).get('level', 0)
+            if severity_level >= 12:  # Critical alerts
+                await self.server.send_notification(
+                    "security/critical-alert",
+                    {
+                        "alert_id": alert.get('id'),
+                        "timestamp": alert.get('timestamp'),
+                        "rule_description": alert.get('rule', {}).get('description'),
+                        "severity": severity_level,
+                        "agent": {
+                            "id": alert.get('agent', {}).get('id'),
+                            "name": alert.get('agent', {}).get('name'),
+                            "ip": alert.get('agent', {}).get('ip')
+                        },
+                        "location": alert.get('location'),
+                        "message": f"Critical security alert: {alert.get('rule', {}).get('description')}"
+                    }
+                )
+                self.logger.info(f"Sent critical alert notification for alert {alert.get('id')}")
+        except Exception as e:
+            self.logger.error(f"Failed to send critical alert notification: {str(e)}")
+    
+    async def _send_agent_status_notification(self, agent_id: str, status: str, previous_status: str):
+        """Send notification for agent status changes."""
+        try:
+            if status != previous_status:
+                await self.server.send_notification(
+                    "agents/status-change",
+                    {
+                        "agent_id": agent_id,
+                        "new_status": status,
+                        "previous_status": previous_status,
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "message": f"Agent {agent_id} status changed from {previous_status} to {status}"
+                    }
+                )
+                self.logger.info(f"Sent agent status notification for agent {agent_id}: {previous_status} -> {status}")
+        except Exception as e:
+            self.logger.error(f"Failed to send agent status notification: {str(e)}")
+    
+    async def _send_system_health_notification(self, health_status: str, details: dict):
+        """Send notification for system health changes."""
+        try:
+            await self.server.send_notification(
+                "system/health-status",
+                {
+                    "health_status": health_status,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "details": details,
+                    "message": f"System health status: {health_status}"
+                }
+            )
+            self.logger.info(f"Sent system health notification: {health_status}")
+        except Exception as e:
+            self.logger.error(f"Failed to send system health notification: {str(e)}")
+    
+    async def _report_progress(self, current: int, total: int, message: str):
+        """Report progress for long-running operations."""
+        try:
+            progress = (current / total) * 100
+            await self.server.send_notification(
+                "operations/progress",
+                {
+                    "progress": progress,
+                    "current_step": current,
+                    "total_steps": total,
+                    "message": message,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            )
+            self.logger.debug(f"Progress reported: {progress:.1f}% - {message}")
+        except Exception as e:
+            self.logger.error(f"Failed to report progress: {str(e)}")
     
     async def run(self):
         """Run the MCP server with robust error handling and logging."""

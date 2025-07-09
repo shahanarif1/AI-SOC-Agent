@@ -22,6 +22,10 @@ wheels/
 .installed.cfg
 *.egg
 
+# Build artifacts
+*.whl
+*.tar.gz
+
 # Virtual environments
 .env
 .env.local
@@ -68,4 +72,26 @@ htmlcov/
 # Temporary
 *.tmp
 temp/
+
+# Validation reports
+validation_report.json
+*_validation_report.md
+*_compatibility_report.json
+*_communication_report.json
+*_config_template.json
+
+# Test files
+.test_resilience.py
+get-pip.py
+installation_test_report_*.json
+test_installation.py
+test_claude_desktop_*.py
+static_claude_desktop_analysis.py
+test_venv/
+
+# Development and planning files
+*_IMPLEMENTATION_PLAN.md
+*_SCOPE.md
+fix-*.py
+production-checklist.md
 

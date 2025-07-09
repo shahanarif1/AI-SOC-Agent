@@ -273,9 +273,10 @@ class WazuhAPIClient:
         except aiohttp.ClientError as e:
             self.error_count += 1
             handle_connection_error(e, urljoin(self.base_url, endpoint))
-        except Exception as e:
+        except (json.JSONDecodeError, asyncio.TimeoutError, AuthenticationError, 
+                AuthorizationError, APIError, RateLimitError) as e:
             self.error_count += 1
-            logger.error(f"Unexpected API error: {str(e)}")
+            logger.error(f"API error ({type(e).__name__}): {str(e)}")
             
             # Use error recovery manager for intelligent recovery
             recovery_result = await error_recovery_manager.handle_error(
@@ -288,7 +289,12 @@ class WazuhAPIClient:
             if recovery_result.get("success"):
                 return recovery_result.get("data")
             else:
-                raise APIError(f"API request failed: {str(e)}")
+                raise APIError(f"API request failed ({type(e).__name__}): {str(e)}")
+        except Exception as e:
+            # Log unexpected exceptions but allow them to bubble up for proper debugging
+            self.error_count += 1
+            logger.error(f"Unexpected error in API request: {type(e).__name__}: {str(e)}")
+            raise
     
     @log_performance
     async def get_alerts(
