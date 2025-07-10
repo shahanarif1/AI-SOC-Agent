@@ -12,6 +12,9 @@ A Model Context Protocol (MCP) server that connects Wazuh SIEM with Claude Deskt
 - **AI Analysis**: Get AI-powered security insights, threat analysis, and compliance reports
 - **Natural Language**: Ask questions like "Show me critical alerts from the last hour" or "Analyze this security incident"
 
+<h2>🙏 Special Thanks</h2>
+<p>Big shout-out to <strong><a href="https://github.com/marcolinux46">@marcolinux46</a></strong> for tireless testing, detailed feedback, and reporting edge-case Wazuh issues round the clock.</p>
+
 ## Quick Setup
 
 ### 1. Install
