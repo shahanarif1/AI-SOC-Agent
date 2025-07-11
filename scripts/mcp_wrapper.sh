@@ -10,7 +10,7 @@ set -euo pipefail
 
 # Script configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$SCRIPT_DIR"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 VENV_PYTHON="$PROJECT_ROOT/venv/bin/python3"
 MAIN_SCRIPT="$PROJECT_ROOT/src/wazuh_mcp_server/main.py"
 ENV_FILE="$PROJECT_ROOT/.env"

@@ -19,7 +19,7 @@ A Model Context Protocol (MCP) server that connects Wazuh SIEM with Claude Deskt
 ```bash
 git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
 cd Wazuh-MCP-Server
-python3 install.py
+python3 scripts/install.py
 ```
 
 ### 2. Configure
@@ -64,7 +64,7 @@ Add the appropriate configuration for your platform:
 {
   "mcpServers": {
     "wazuh": {
-      "command": "/full/path/to/Wazuh-MCP-Server/mcp_wrapper.sh",
+      "command": "/full/path/to/Wazuh-MCP-Server/scripts/mcp_wrapper.sh",
       "args": ["--stdio"]
     }
   }
@@ -101,7 +101,7 @@ Replace `/full/path/to/Wazuh-MCP-Server` with your actual installation path.
 
 **Note**: The configuration file is not created automatically. You must use Claude Desktop's Developer settings to create it.
 
-For detailed setup instructions, see [Claude Desktop Setup Guide](docs/claude-desktop-setup.md).
+For detailed setup instructions, see [Claude Desktop Setup Guide](docs/user-guides/claude-desktop-setup.md).
 
 **Note**: Unix systems (macOS/Linux) use the wrapper script for optimal compatibility, while Windows uses direct Python execution.
 
@@ -157,7 +157,7 @@ DEBUG=false
 ### Connection Issues
 ```bash
 # Test your setup
-python validate_setup.py
+python scripts/validate_setup.py
 
 # Check Wazuh connectivity
 curl -u username:password https://your-wazuh:55000/
@@ -205,12 +205,12 @@ curl -u username:password https://your-wazuh:55000/
 
 1. **Ensure wrapper script is executable**:
    ```bash
-   chmod +x /path/to/Wazuh-MCP-Server/mcp_wrapper.sh
+   chmod +x /path/to/Wazuh-MCP-Server/scripts/mcp_wrapper.sh
    ```
 
 2. **Test the wrapper**:
    ```bash
-   ./mcp_wrapper.sh --stdio
+   ./scripts/mcp_wrapper.sh --stdio
    ```
 
 3. **Use wrapper in Claude Desktop config**:
@@ -218,14 +218,14 @@ curl -u username:password https://your-wazuh:55000/
    {
      "mcpServers": {
        "wazuh": {
-         "command": "/full/path/to/Wazuh-MCP-Server/mcp_wrapper.sh",
+         "command": "/full/path/to/Wazuh-MCP-Server/scripts/mcp_wrapper.sh",
          "args": ["--stdio"]
        }
      }
    }
    ```
 
-**Why this is recommended**: The wrapper script handles environment setup, working directories, and temporary file creation across Unix-like systems (macOS/Linux). See [Unix Troubleshooting Guide](docs/unix-troubleshooting.md) for detailed information.
+**Why this is recommended**: The wrapper script handles environment setup, working directories, and temporary file creation across Unix-like systems (macOS/Linux). See [Unix Troubleshooting Guide](docs/user-guides/unix-troubleshooting.md) for detailed information.
 
 ### SSL Issues
 
@@ -258,7 +258,7 @@ WAZUH_ALLOW_SELF_SIGNED=true
 - Bash shell (for wrapper script)
 - Write permissions for temporary directories
 - Standard development tools (gcc, make) for some dependencies
-- Execute permissions for wrapper script (`chmod +x mcp_wrapper.sh`)
+- Execute permissions for wrapper script (`chmod +x scripts/mcp_wrapper.sh`)
 
 ### Windows
 - Windows Terminal or PowerShell (recommended)
@@ -267,10 +267,21 @@ WAZUH_ALLOW_SELF_SIGNED=true
 
 ## Documentation
 
-- [Claude Desktop Setup Guide](docs/claude-desktop-setup.md) - Complete setup instructions
-- [Unix Troubleshooting Guide](docs/unix-troubleshooting.md) - macOS/Linux troubleshooting  
-- [Windows Troubleshooting Guide](docs/windows-troubleshooting.md) - Windows-specific issues
-- [Wrapper Script Documentation](WRAPPER_SCRIPT_DOCUMENTATION.md) - Technical details
+### 📚 User Guides
+- [Claude Desktop Setup Guide](docs/user-guides/claude-desktop-setup.md) - Complete setup instructions
+- [Unix Troubleshooting Guide](docs/user-guides/unix-troubleshooting.md) - macOS/Linux troubleshooting  
+- [Windows Troubleshooting Guide](docs/user-guides/windows-troubleshooting.md) - Windows-specific issues
+
+### 🔧 Technical Documentation
+- [Comprehensive Audit Report](docs/technical/COMPREHENSIVE_AUDIT_REPORT.md) - Complete implementation overview
+- [Phase 5 Enhancement System](docs/technical/PHASE_5_PROMPT_ENHANCEMENT_DETAILED_PLAN.md) - Advanced features
+- [Wrapper Script Documentation](docs/technical/WRAPPER_SCRIPT_DOCUMENTATION.md) - Technical details
+- [Directory Structure](docs/DIRECTORY_STRUCTURE.md) - Repository organization
+
+### 💻 Development
+- [Contributing Guidelines](docs/development/CONTRIBUTING.md) - How to contribute
+- [Configuration Examples](examples/configuration_examples/) - Environment configurations
+- [Usage Examples](examples/basic_usage.py) - Code examples and queries
 
 ## Support
 
