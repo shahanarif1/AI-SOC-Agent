@@ -14,18 +14,18 @@ This guide covers troubleshooting for Unix-like systems (macOS and Linux) using 
 
 **Solution**:
 ```bash
-chmod +x mcp_wrapper.sh
+chmod +x scripts/mcp_wrapper.sh
 ```
 
 #### Script Not Found
 
-**Error**: `./mcp_wrapper.sh: No such file or directory`
+**Error**: `./scripts/mcp_wrapper.sh: No such file or directory`
 
 **Solution**: Verify you're in the correct directory and the script exists:
 ```bash
-ls -la mcp_wrapper.sh
+ls -la scripts/mcp_wrapper.sh
 cd /path/to/Wazuh-MCP-Server
-chmod +x mcp_wrapper.sh
+chmod +x scripts/mcp_wrapper.sh
 ```
 
 ### Environment Issues
@@ -144,7 +144,7 @@ sudo pacman -S python
 
 2. **Check wrapper script paths**:
    ```bash
-   head -20 mcp_wrapper.sh
+   head -20 scripts/mcp_wrapper.sh
    ```
 
 ### Python Path Issues
@@ -197,7 +197,7 @@ sudo pacman -S python
    {
      "mcpServers": {
        "wazuh": {
-         "command": "/full/path/to/Wazuh-MCP-Server/mcp_wrapper.sh",
+         "command": "/full/path/to/Wazuh-MCP-Server/scripts/mcp_wrapper.sh",
          "args": ["--stdio"]
        }
      }
@@ -265,12 +265,12 @@ VERIFY_SSL=false
 
 1. **Test wrapper script**:
    ```bash
-   ./mcp_wrapper.sh --stdio
+   ./scripts/mcp_wrapper.sh --stdio
    ```
 
 2. **Test MCP communication**:
    ```bash
-   echo '{"jsonrpc": "2.0", "method": "initialize", "id": 1}' | ./mcp_wrapper.sh --stdio
+   echo '{"jsonrpc": "2.0", "method": "initialize", "id": 1}' | ./scripts/mcp_wrapper.sh --stdio
    ```
 
 3. **Test Wazuh authentication**:
@@ -296,7 +296,7 @@ Enable debug mode for detailed troubleshooting:
 ```bash
 # Enable debug in wrapper script
 export DEBUG=1
-./mcp_wrapper.sh --stdio
+./scripts/mcp_wrapper.sh --stdio
 ```
 
 Or add to `.env` file:
@@ -361,7 +361,7 @@ When reporting issues, include:
    ```bash
    uname -a
    python3 --version
-   ls -la mcp_wrapper.sh
+   ls -la scripts/mcp_wrapper.sh
    ```
 
 2. **Configuration**:
@@ -378,7 +378,7 @@ When reporting issues, include:
 
 4. **Test results**:
    ```bash
-   ./mcp_wrapper.sh --stdio 2>&1 | head -20
+   ./scripts/mcp_wrapper.sh --stdio 2>&1 | head -20
    ```
 
 ### Support Resources

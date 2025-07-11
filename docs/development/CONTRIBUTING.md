@@ -35,7 +35,7 @@ git clone https://github.com/YOUR_USERNAME/Wazuh-MCP-Server.git
 cd Wazuh-MCP-Server
 
 # Run the installation script
-python3 install.py
+python3 scripts/install.py
 
 # Set up environment
 # Edit .env with your test Wazuh server details
@@ -55,7 +55,7 @@ black --check src/
 python src/wazuh_mcp_server/main.py --stdio
 
 # Validate setup
-python validate_setup.py
+python scripts/validate_setup.py
 ```
 
 ## 📝 Coding Standards
