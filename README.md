@@ -14,7 +14,7 @@ A Model Context Protocol (MCP) server that connects Wazuh SIEM with Claude Deskt
 
 <img width="797" height="568" alt="claude0mcp-wazuh" src="https://github.com/user-attachments/assets/458d3c94-e1f9-4143-a1a4-85cb629287d4" />
 
-## ✨ What's New in v2.0.0
+## ✨ What's Coming in v2.0.0 (Future Release)
 
 🎯 **Enhanced Capabilities**: 23 powerful tools (109% increase from v1.0.0)  
 🧠 **Phase 5 Prompt Enhancement System**: Advanced context aggregation and adaptive responses  
@@ -22,18 +22,57 @@ A Model Context Protocol (MCP) server that connects Wazuh SIEM with Claude Deskt
 🏗️ **Modular Architecture**: Clean, maintainable codebase with standardized patterns  
 🚀 **Migration Support**: Seamless upgrade from v1.0.0 with automated migration tools  
 
+## 🏷️ Version Information
+
+### **Current Main Branch: v2.0.0-dev** (This Branch)
+- **Status**: 🚧 **Active Development** - Main branch with latest features under development
+- **Tools**: 23 powerful security tools with advanced capabilities  
+- **Best For**: Developers and early adopters who want to test upcoming features
+- **Stability**: Under active development - use for testing purposes only
+
+### **Stable Release: v1.0.0** 
+- **Status**: ✅ **Production Stable** - [GitHub Release](https://github.com/gensecaihq/Wazuh-MCP-Server/releases/tag/v1.0.0)
+- **Tools**: 11 core security tools covering essential operations
+- **Best For**: Production environments requiring maximum stability
+- **Download**: Go to [Releases](https://github.com/gensecaihq/Wazuh-MCP-Server/releases) and download v1.0.0
+- **Documentation**: [v1.0.0 README](https://github.com/gensecaihq/Wazuh-MCP-Server/blob/v1.0.0/README.md)
+
+> **💡 Recommendation**: Use **v1.0.0 release** for all production systems. The **main branch (v2.0.0-dev)** is for testing and development only - it will be released after thorough testing and validation.
+
 <h2>🙏 Special Thanks</h2>
 <p>Big shout-out to <strong><a href="https://github.com/marcolinux46">@marcolinux46</a></strong> for tireless testing, detailed feedback, and reporting edge-case Wazuh issues round the clock.</p>
 
 ## Quick Setup
 
+> **Choose Your Version First**: See [Version Information](#️-version-information) above to choose between v1.0.0 (production stable) or main branch (v2.0.0-dev testing only).
+
 ### 1. Install
 
+**For v2.0.0-dev Main Branch (Testing/Development Only):**
 ```bash
 git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
 cd Wazuh-MCP-Server
 python3 scripts/install.py
 ```
+
+**For v1.0.0 (Production Stable):**
+1. Go to [Releases](https://github.com/gensecaihq/Wazuh-MCP-Server/releases)
+2. Download v1.0.0 source code (zip/tar.gz)
+3. Extract and install:
+```bash
+cd Wazuh-MCP-Server-1.0.0
+python3 install.py
+```
+
+**Alternative - Clone v1.0.0 tag:**
+```bash
+git clone -b v1.0.0 https://github.com/gensecaihq/Wazuh-MCP-Server.git
+cd Wazuh-MCP-Server
+python3 install.py
+```
+
+> **📁 Note**: v1.0.0 uses `install.py` in the root directory, while main branch (v2.0.0-dev) uses `scripts/install.py` due to improved organization.  
+> **⚠️ Important**: Main branch is under active development. Use v1.0.0 release for production systems.
 
 ### 2. Configure
 
@@ -286,7 +325,7 @@ WAZUH_ALLOW_SELF_SIGNED=true
 - [Windows Troubleshooting Guide](docs/troubleshooting/windows-troubleshooting.md) - Windows-specific issues
 
 ### 🔧 Technical Documentation
-- [Repository Structure](REPOSITORY_STRUCTURE.md) - Clean, organized codebase structure
+- [Production Readiness Audit](docs/technical/PRODUCTION_READINESS_AUDIT.md) - Development readiness assessment
 - [Comprehensive Audit Report](docs/technical/COMPREHENSIVE_AUDIT_REPORT.md) - Complete implementation overview
 - [Phase 5 Enhancement System](docs/technical/PHASE_5_PROMPT_ENHANCEMENT_DETAILED_PLAN.md) - Advanced features
 - [Wrapper Script Documentation](docs/technical/WRAPPER_SCRIPT_DOCUMENTATION.md) - Technical details
@@ -297,10 +336,8 @@ WAZUH_ALLOW_SELF_SIGNED=true
 - [Usage Examples](examples/basic_usage.py) - Code examples and queries
 
 ### 🚀 Release Information
-- [Migration Guide](docs/MIGRATION_GUIDE.md) - Upgrade from v1.0.0 to v2.0.0
-- [What's Coming](docs/releases/UPCOMING.md) - v2.0.0 features and enhancements
-- [Implementation Status](docs/releases/IMPLEMENTATION_STATUS.md) - Current implementation progress
-- [Known Issues](docs/ISSUES.md) - Issues and fixes
+- [Migration Guide](docs/MIGRATION_GUIDE.md) - Future upgrade path from v1.0.0 to v2.0.0 (when released)
+- [What's Coming](docs/releases/UPCOMING.md) - Planned v2.0.0 features and enhancements
 
 ## Support
 

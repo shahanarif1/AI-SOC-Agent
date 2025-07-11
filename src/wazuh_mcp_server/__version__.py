@@ -1,6 +1,6 @@
 """Version information for Wazuh MCP Server."""
 
-__version__ = "1.1.0"
+__version__ = "2.0.0-dev"
 __author__ = "Wazuh MCP Server Project"
 __email__ = "info@wazuh-mcp-server.org"
 
