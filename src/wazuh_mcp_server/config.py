@@ -149,6 +149,18 @@ class WazuhConfig(BaseModel):
     enable_compliance_checking: bool = Field(default=True)
     enable_experimental: bool = Field(default=False)
     
+    # Prompt Enhancement System (Phase 5) - All default to False for safety
+    enable_prompt_enhancement: bool = Field(default=False, description="Enable prompt enhancement system")
+    enable_context_aggregation: bool = Field(default=False, description="Enable automatic context gathering")
+    enable_adaptive_responses: bool = Field(default=False, description="Enable adaptive response formatting")
+    enable_realtime_updates: bool = Field(default=False, description="Enable real-time context updates")
+    
+    # Prompt Enhancement Performance Settings
+    context_cache_ttl: int = Field(default=300, ge=30, le=3600, description="Context cache TTL in seconds")
+    max_context_size: int = Field(default=1000, ge=100, le=5000, description="Maximum items per context")
+    enhancement_timeout: float = Field(default=5.0, ge=1.0, le=30.0, description="Maximum enhancement processing time")
+    context_aggregation_depth: int = Field(default=3, ge=1, le=5, description="Context aggregation depth level")
+    
 
     # Logging configuration
     debug: bool = Field(default=False)
