@@ -237,6 +237,110 @@ def normalize_path(path: str) -> Path:
     return Path(normalized)
 
 
+def get_wazuh_paths() -> Dict[str, Path]:
+    """Get platform-appropriate Wazuh installation paths.
+    
+    Returns:
+        Dictionary mapping path types to Path objects for the current platform
+    """
+    system = platform.system()
+    
+    if system == "Windows":
+        # Windows Wazuh installation paths
+        base_path = Path("C:/Program Files (x86)/ossec-agent")
+        if not base_path.exists():
+            # Alternative path for newer installations
+            base_path = Path("C:/Program Files/Wazuh Agent")
+        if not base_path.exists():
+            # Fallback generic path
+            base_path = Path("C:/ossec")
+            
+        return {
+            "base": base_path,
+            "logs": base_path / "logs",
+            "bin": base_path / "bin", 
+            "etc": base_path / "etc",
+            "ossec_log": base_path / "logs" / "ossec.log",
+            "api_log": base_path / "logs" / "api.log",
+            "cluster_log": base_path / "logs" / "cluster.log",
+            "modulesd_log": base_path / "logs" / "wazuh-modulesd.log",
+            "authd_log": base_path / "logs" / "wazuh-authd.log",
+            "monitord_log": base_path / "logs" / "wazuh-monitord.log",
+            "remoted_log": base_path / "logs" / "wazuh-remoted.log"
+        }
+    else:
+        # Unix-like systems (Linux, macOS)
+        base_path = Path("/var/ossec")
+        
+        return {
+            "base": base_path,
+            "logs": base_path / "logs",
+            "bin": base_path / "bin",
+            "etc": base_path / "etc", 
+            "ossec_log": base_path / "logs" / "ossec.log",
+            "api_log": base_path / "logs" / "api.log",
+            "cluster_log": base_path / "logs" / "cluster.log",
+            "modulesd_log": base_path / "logs" / "wazuh-modulesd.log",
+            "authd_log": base_path / "logs" / "wazuh-authd.log",
+            "monitord_log": base_path / "logs" / "wazuh-monitord.log",
+            "remoted_log": base_path / "logs" / "wazuh-remoted.log"
+        }
+
+
+def get_wazuh_log_path(log_type: str) -> Path:
+    """Get the path for a specific Wazuh log file.
+    
+    Args:
+        log_type: Type of log file (e.g., 'ossec', 'api', 'cluster', etc.)
+        
+    Returns:
+        Path object for the specified log file
+    """
+    paths = get_wazuh_paths()
+    log_key = f"{log_type}_log"
+    
+    if log_key in paths:
+        return paths[log_key]
+    else:
+        # Fallback: construct path from log type
+        return paths["logs"] / f"{log_type}.log"
+
+
+def get_suspicious_paths() -> list:
+    """Get list of suspicious file paths for different platforms.
+    
+    Returns:
+        List of path patterns that might indicate malicious activity
+    """
+    system = platform.system()
+    
+    common_suspicious = [
+        # Temporary directories
+        "temp/", "tmp/", "temporary/",
+        # Downloads directories  
+        "downloads/", "download/",
+        # Common malware locations
+        "windows/temp/", "windows/system32/",
+    ]
+    
+    if system == "Windows":
+        return common_suspicious + [
+            "\\temp\\", "\\tmp\\", "\\temporary\\",
+            "\\downloads\\", "\\download\\",
+            "\\windows\\temp\\", "\\windows\\system32\\",
+            "\\users\\public\\", "\\programdata\\",
+            "\\appdata\\local\\temp\\", "\\appdata\\roaming\\",
+            "%temp%", "%tmp%", "%appdata%", "%programdata%"
+        ]
+    else:
+        return common_suspicious + [
+            "/tmp/", "/var/tmp/", "/dev/shm/",
+            "/home/*/downloads/", "/home/*/Downloads/",
+            "/usr/tmp/", "/var/spool/",
+            "~/.cache/", "~/.local/", "~/.config/"
+        ]
+
+
 def is_admin() -> bool:
     """Check if the current process is running with administrator privileges.
     

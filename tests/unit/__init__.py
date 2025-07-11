@@ -1,0 +1,1 @@
+"""Unit tests for Wazuh MCP Server components."""

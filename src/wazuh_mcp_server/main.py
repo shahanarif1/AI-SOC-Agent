@@ -38,6 +38,14 @@ from wazuh_mcp_server.utils import (
     validate_ip_address, validate_file_hash, 
     ValidationError, WazuhMCPError, ConfigurationError, APIError
 )
+from wazuh_mcp_server.utils.error_standardization import (
+    config_error_handler, optional_feature_handler, safe_execute,
+    StandardErrorResponse, ErrorAggregator
+)
+from wazuh_mcp_server.utils.platform_utils import (
+    get_wazuh_log_path, get_wazuh_paths, get_suspicious_paths
+)
+from wazuh_mcp_server.tools.factory import ToolFactory
 
 # SSL warnings will be disabled per-request basis in clients if needed
 # urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # SECURITY: Removed global disable
@@ -46,12 +54,10 @@ from wazuh_mcp_server.utils import (
 class WazuhMCPServer:
     """Production-grade MCP Server implementation for Wazuh integration."""
     
+    @config_error_handler(context={"operation": "server_initialization"})
     def __init__(self):
         # Initialize configuration first
-        try:
-            self.config = WazuhConfig.from_env()
-        except Exception as e:
-            raise ConfigurationError(f"Failed to load configuration: {str(e)}") from e
+        self.config = WazuhConfig.from_env()
         
         # Setup logging with configuration
         self.logger = setup_logging(
@@ -63,6 +69,9 @@ class WazuhMCPServer:
         
         self.logger.info(f"Initializing Wazuh MCP Server v{__version__}")
         
+        # Check optional dependencies and warn about missing features
+        self._check_optional_dependencies()
+        
         # Initialize components
         self.server = Server("wazuh-mcp")
         self.api_client = WazuhClientManager(self.config)
@@ -70,25 +79,102 @@ class WazuhMCPServer:
         self.compliance_analyzer = ComplianceAnalyzer()
         
         # Initialize optional prompt enhancement system (Phase 5)
-        self.context_aggregator = None
-        if getattr(self.config, 'enable_prompt_enhancement', False):
-            try:
-                from .prompt_enhancement import PromptContextAggregator
-                self.context_aggregator = PromptContextAggregator(self)
-                # Setup pipelines after all components are initialized
-                self.context_aggregator.setup_pipelines()
-                self.logger.info("Prompt enhancement system initialized")
-            except ImportError as e:
-                self.logger.warning(f"Prompt enhancement system not available: {str(e)}")
-                self.context_aggregator = None
-            except Exception as e:
-                self.logger.error(f"Failed to initialize prompt enhancement system: {str(e)}")
-                self.context_aggregator = None
+        self.context_aggregator = self._initialize_prompt_enhancement()
+        
+        # Initialize modular tool system for better organization
+        self.tool_factory = safe_execute(
+            lambda: ToolFactory(self),
+            default_value=None,
+            error_context={"operation": "tool_factory_init"},
+            log_errors=True
+        )
         
         # Setup handlers
         self._setup_handlers()
         
         self.logger.info("Wazuh MCP Server initialized successfully")
+    
+    def _check_optional_dependencies(self):
+        """Check for optional dependencies and warn about missing features."""
+        missing_features = []
+        available_features = []
+        
+        # Check external API dependencies
+        if self.config.virustotal_api_key:
+            try:
+                import requests  # Basic dependency for API calls
+                available_features.append("VirusTotal integration")
+            except ImportError:
+                missing_features.append("VirusTotal integration (requests library missing)")
+        
+        if self.config.shodan_api_key:
+            try:
+                import requests
+                available_features.append("Shodan integration")
+            except ImportError:
+                missing_features.append("Shodan integration (requests library missing)")
+        
+        if self.config.abuseipdb_api_key:
+            try:
+                import requests
+                available_features.append("AbuseIPDB integration")
+            except ImportError:
+                missing_features.append("AbuseIPDB integration (requests library missing)")
+        
+        # Check prompt enhancement dependencies
+        if getattr(self.config, 'enable_prompt_enhancement', False):
+            try:
+                from .prompt_enhancement import PromptContextAggregator
+                available_features.append("Prompt enhancement system")
+            except ImportError:
+                missing_features.append("Prompt enhancement system (implementation missing)")
+        
+        # Check ML analysis dependencies (if enabled)
+        if getattr(self.config, 'enable_ml_analysis', False):
+            try:
+                # Basic check for common ML libraries
+                import json  # Always available
+                available_features.append("Basic ML analysis")
+                
+                # Check for advanced ML libraries (optional)
+                try:
+                    import numpy
+                    available_features.append("Advanced numerical analysis")
+                except ImportError:
+                    self.logger.debug("NumPy not available - basic analysis only")
+                    
+            except ImportError:
+                missing_features.append("ML analysis capabilities")
+        
+        # Log results
+        if available_features:
+            self.logger.info(f"Optional features available: {', '.join(available_features)}")
+        
+        if missing_features:
+            self.logger.warning(f"Optional features unavailable: {', '.join(missing_features)}")
+            self.logger.info("Install missing dependencies to enable additional features")
+        
+        # Store for later reference
+        self._available_features = available_features
+        self._missing_features = missing_features
+    
+    @optional_feature_handler(context={"feature": "prompt_enhancement"})
+    def _initialize_prompt_enhancement(self):
+        """Initialize prompt enhancement system with standardized error handling."""
+        if not getattr(self.config, 'enable_prompt_enhancement', False):
+            return None
+        
+        from .prompt_enhancement import PromptContextAggregator
+        context_aggregator = PromptContextAggregator(self)
+        # Setup pipelines after all components are initialized
+        context_aggregator.setup_pipelines()
+        self.logger.info("Prompt enhancement system initialized")
+        return context_aggregator
+    
+    def _get_current_timestamp(self) -> str:
+        """Get current timestamp in ISO format."""
+        from datetime import datetime
+        return datetime.utcnow().isoformat() + "Z"
     
     def _format_error_response(self, error: Exception, request_id: str = None, 
                                execution_time: float = None) -> str:
@@ -10368,7 +10454,7 @@ Please conduct a thorough forensic analysis that follows industry best practices
                 "error_type": "file_not_found",
                 "priority": "medium",
                 "resolution": "Verify log file paths in ossec.conf and ensure files exist",
-                "command": "ls -la /path/to/logfile && /var/ossec/bin/ossec-control restart"
+                "command": f"ls -la /path/to/logfile && {get_wazuh_paths()['bin']}/ossec-control restart"
             })
         
         # Parsing errors
@@ -10377,7 +10463,7 @@ Please conduct a thorough forensic analysis that follows industry best practices
                 "error_type": "parsing_error",
                 "priority": "medium",
                 "resolution": "Review log formats and decoder configurations",
-                "command": "/var/ossec/bin/ossec-logtest < /path/to/logfile"
+                "command": f"{get_wazuh_paths()['bin']}/ossec-logtest < /path/to/logfile"
             })
         
         # Disk errors
@@ -14698,7 +14784,7 @@ Please conduct a thorough forensic analysis that follows industry best practices
                     "timestamp": (start_dt + timedelta(minutes=i)).isoformat(),
                     "log_type": log_type,
                     "message": log_line,
-                    "file_path": f"/var/ossec/logs/{log_type}.log",
+                    "file_path": str(get_wazuh_log_path(log_type)),
                     "line_number": 1000 + i,
                     "severity": self._extract_severity(log_line),
                     "source_component": log_type,
@@ -15179,15 +15265,16 @@ Please conduct a thorough forensic analysis that follows industry best practices
         all_errors = []
         
         try:
-            # Common log paths for Wazuh manager
+            # Common log paths for Wazuh manager - platform-agnostic
+            wazuh_paths = get_wazuh_paths()
             log_paths = [
-                "/var/ossec/logs/ossec.log",
-                "/var/ossec/logs/api.log", 
-                "/var/ossec/logs/cluster.log",
-                "/var/ossec/logs/wazuh-modulesd.log",
-                "/var/ossec/logs/wazuh-authd.log",
-                "/var/ossec/logs/wazuh-monitord.log",
-                "/var/ossec/logs/wazuh-remoted.log"
+                str(wazuh_paths["ossec_log"]),
+                str(wazuh_paths["api_log"]), 
+                str(wazuh_paths["cluster_log"]),
+                str(wazuh_paths["modulesd_log"]),
+                str(wazuh_paths["authd_log"]),
+                str(wazuh_paths["monitord_log"]),
+                str(wazuh_paths["remoted_log"])
             ]
             
             error_pattern = self._build_error_search_pattern(error_levels, pattern_filter)

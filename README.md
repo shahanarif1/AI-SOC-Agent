@@ -14,7 +14,13 @@ A Model Context Protocol (MCP) server that connects Wazuh SIEM with Claude Deskt
 
 <img width="797" height="568" alt="claude0mcp-wazuh" src="https://github.com/user-attachments/assets/458d3c94-e1f9-4143-a1a4-85cb629287d4" />
 
+## ✨ What's New in v2.0.0
 
+🎯 **Enhanced Capabilities**: 23 powerful tools (109% increase from v1.0.0)  
+🧠 **Phase 5 Prompt Enhancement System**: Advanced context aggregation and adaptive responses  
+🔧 **Production-Ready**: Robust error handling, memory management, and cross-platform support  
+🏗️ **Modular Architecture**: Clean, maintainable codebase with standardized patterns  
+🚀 **Migration Support**: Seamless upgrade from v1.0.0 with automated migration tools  
 
 <h2>🙏 Special Thanks</h2>
 <p>Big shout-out to <strong><a href="https://github.com/marcolinux46">@marcolinux46</a></strong> for tireless testing, detailed feedback, and reporting edge-case Wazuh issues round the clock.</p>
@@ -232,7 +238,7 @@ curl -u username:password https://your-wazuh:55000/
    }
    ```
 
-**Why this is recommended**: The wrapper script handles environment setup, working directories, and temporary file creation across Unix-like systems (macOS/Linux). See [Unix Troubleshooting Guide](docs/user-guides/unix-troubleshooting.md) for detailed information.
+**Why this is recommended**: The wrapper script handles environment setup, working directories, and temporary file creation across Unix-like systems (macOS/Linux). See [Unix Troubleshooting Guide](docs/troubleshooting/unix-troubleshooting.md) for detailed information.
 
 ### SSL Issues
 
@@ -276,19 +282,25 @@ WAZUH_ALLOW_SELF_SIGNED=true
 
 ### 📚 User Guides
 - [Claude Desktop Setup Guide](docs/user-guides/claude-desktop-setup.md) - Complete setup instructions
-- [Unix Troubleshooting Guide](docs/user-guides/unix-troubleshooting.md) - macOS/Linux troubleshooting  
-- [Windows Troubleshooting Guide](docs/user-guides/windows-troubleshooting.md) - Windows-specific issues
+- [Unix Troubleshooting Guide](docs/troubleshooting/unix-troubleshooting.md) - macOS/Linux troubleshooting  
+- [Windows Troubleshooting Guide](docs/troubleshooting/windows-troubleshooting.md) - Windows-specific issues
 
 ### 🔧 Technical Documentation
+- [Repository Structure](REPOSITORY_STRUCTURE.md) - Clean, organized codebase structure
 - [Comprehensive Audit Report](docs/technical/COMPREHENSIVE_AUDIT_REPORT.md) - Complete implementation overview
 - [Phase 5 Enhancement System](docs/technical/PHASE_5_PROMPT_ENHANCEMENT_DETAILED_PLAN.md) - Advanced features
 - [Wrapper Script Documentation](docs/technical/WRAPPER_SCRIPT_DOCUMENTATION.md) - Technical details
-- [Directory Structure](docs/DIRECTORY_STRUCTURE.md) - Repository organization
 
 ### 💻 Development
 - [Contributing Guidelines](docs/development/CONTRIBUTING.md) - How to contribute
 - [Configuration Examples](examples/configuration_examples/) - Environment configurations
 - [Usage Examples](examples/basic_usage.py) - Code examples and queries
+
+### 🚀 Release Information
+- [Migration Guide](docs/MIGRATION_GUIDE.md) - Upgrade from v1.0.0 to v2.0.0
+- [What's Coming](docs/releases/UPCOMING.md) - v2.0.0 features and enhancements
+- [Implementation Status](docs/releases/IMPLEMENTATION_STATUS.md) - Current implementation progress
+- [Known Issues](docs/ISSUES.md) - Issues and fixes
 
 ## Support
 

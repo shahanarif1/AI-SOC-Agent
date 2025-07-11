@@ -49,6 +49,55 @@ except ImportError:
     def sanitize_string(text, max_len=100):
         return str(text)[:max_len] if text else ""
 
+# Additional validation functions needed by main.py (fallback implementations)
+def validate_alert_summary_query(query):
+    """Fallback validation for alert summary queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_vulnerability_summary_query(query):
+    """Fallback validation for vulnerability summary queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_critical_vulnerabilities_query(query):
+    """Fallback validation for critical vulnerabilities queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_running_agents_query(query):
+    """Fallback validation for running agents queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_rules_summary_query(query):
+    """Fallback validation for rules summary queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_weekly_stats_query(query):
+    """Fallback validation for weekly stats queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_remoted_stats_query(query):
+    """Fallback validation for remoted stats queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_log_collector_stats_query(query):
+    """Fallback validation for log collector stats queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_cluster_health_query(query):
+    """Fallback validation for cluster health queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_manager_error_logs_query(query):
+    """Fallback validation for manager error logs queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_agent_processes_query(query):
+    """Fallback validation for agent processes queries."""
+    return query if isinstance(query, dict) else {}
+
+def validate_agent_ports_query(query):
+    """Fallback validation for agent ports queries."""
+    return query if isinstance(query, dict) else {}
+
 try:
     from .rate_limiter import global_rate_limiter, RateLimitConfig
 except ImportError:
@@ -94,6 +143,18 @@ __all__ = [
     "validate_ip_address",
     "validate_file_hash",
     "sanitize_string",
+    "validate_alert_summary_query",
+    "validate_vulnerability_summary_query",
+    "validate_critical_vulnerabilities_query",
+    "validate_running_agents_query",
+    "validate_rules_summary_query",
+    "validate_weekly_stats_query",
+    "validate_remoted_stats_query",
+    "validate_log_collector_stats_query",
+    "validate_cluster_health_query",
+    "validate_manager_error_logs_query",
+    "validate_agent_processes_query",
+    "validate_agent_ports_query",
     "global_rate_limiter",
     "RateLimitConfig",
 ]

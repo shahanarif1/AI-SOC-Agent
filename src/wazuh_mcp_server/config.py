@@ -161,6 +161,12 @@ class WazuhConfig(BaseModel):
     enhancement_timeout: float = Field(default=5.0, ge=1.0, le=30.0, description="Maximum enhancement processing time")
     context_aggregation_depth: int = Field(default=3, ge=1, le=5, description="Context aggregation depth level")
     
+    # Memory Management Settings (Issue #5 fix)
+    max_cache_memory_mb: int = Field(default=500, ge=50, le=2000, description="Maximum memory for caching in MB")
+    max_context_count: int = Field(default=100, ge=10, le=1000, description="Maximum number of contexts to keep in memory")
+    cache_cleanup_aggressive: bool = Field(default=False, description="Enable aggressive cache cleanup")
+    memory_check_interval: int = Field(default=300, ge=60, le=3600, description="Memory usage check interval in seconds")
+    
 
     # Logging configuration
     debug: bool = Field(default=False)
@@ -206,6 +212,21 @@ class WazuhConfig(BaseModel):
             raise ValueError(f"LOG_LEVEL must be one of {valid_levels}")
         return v.upper()
     
+    @validator('enable_prompt_enhancement', 'enable_context_aggregation', 
+               'enable_adaptive_responses', 'enable_realtime_updates',
+               'enable_external_intel', 'enable_ml_analysis', 
+               'enable_compliance_checking', 'enable_experimental',
+               pre=True)
+    def validate_feature_flags(cls, v):
+        """Validate feature flag values are proper booleans."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return cls._parse_bool(v)
+        if v is None:
+            return False
+        raise ValueError(f"Feature flag must be boolean or valid string (true/false/yes/no/1/0/on/off), got: {type(v).__name__}")
+    
     @property
     def base_url(self) -> str:
         """Get the base URL for Wazuh API."""
@@ -216,7 +237,32 @@ class WazuhConfig(BaseModel):
         """Parse boolean from string with consistent handling."""
         if value is None:
             return False
-        return value.lower() in ("true", "yes", "1", "on")
+        if isinstance(value, bool):
+            return value
+        if not isinstance(value, str):
+            return bool(value)
+        
+        # Normalize the string value
+        normalized = value.strip().lower()
+        
+        # True values
+        if normalized in ("true", "yes", "1", "on", "enabled", "enable"):
+            return True
+        
+        # False values  
+        if normalized in ("false", "no", "0", "off", "disabled", "disable", ""):
+            return False
+            
+        # Handle numeric strings
+        try:
+            return bool(int(normalized))
+        except ValueError:
+            pass
+            
+        # If we can't parse it, log a warning and default to False
+        logging.warning(f"Unable to parse boolean value '{value}', defaulting to False. "
+                       f"Valid values: true/false, yes/no, 1/0, on/off, enabled/disabled")
+        return False
     
     @classmethod
     def from_env(cls) -> 'WazuhConfig':
