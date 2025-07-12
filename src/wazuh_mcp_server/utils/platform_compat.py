@@ -7,7 +7,9 @@ import os
 import platform
 import sys
 import warnings
+import logging
 from typing import Any, Callable, Optional
+
 
 def detect_platform() -> dict:
     """Detect current platform and Pydantic version."""
@@ -48,12 +50,13 @@ def detect_platform() -> dict:
         'platform_string': platform.platform()
     }
 
+
 # Global platform info
 PLATFORM_INFO = detect_platform()
 
+
 def log_platform_info():
     """Log platform detection results for debugging."""
-    import logging
     logging.info(f"Platform detected: {PLATFORM_INFO}")
     if PLATFORM_INFO['is_fedora'] and PLATFORM_INFO['pydantic_v2']:
         logging.warning("Fedora with Pydantic V2 detected - using compatibility mode")

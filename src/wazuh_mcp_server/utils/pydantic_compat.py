@@ -1,10 +1,11 @@
 """
-Comprehensive Pydantic V1/V2 compatibility for v1.0.0.
+Comprehensive Pydantic V1/V2 compatibility for v1.0.1 hotfix.
 Specifically designed for Fedora compatibility while maintaining macOS/Ubuntu functionality.
 """
 
 import sys
 import warnings
+import logging
 from typing import Any, Callable, Dict, Optional, Type, Union
 
 from .platform_compat import PLATFORM_INFO, log_platform_info
@@ -63,10 +64,16 @@ try:
                 return wrapper
             return decorator
         
-        # V1-compatible BaseModel
+        # V1-compatible BaseModel with V2 config compatibility
         class BaseModel(V2BaseModel):
             """V1-compatible BaseModel for V2."""
-            pass
+            
+            # V2 configuration compatibility
+            model_config = {
+                'str_strip_whitespace': True,
+                'validate_assignment': True,
+                'extra': 'forbid'
+            }
             
         # Fedora-specific warning
         if PLATFORM_INFO['is_fedora']:
@@ -84,7 +91,6 @@ try:
         
         # Log success for non-Fedora systems
         if not PLATFORM_INFO['is_fedora']:
-            import logging
             logging.info(f"Pydantic V1 detected on {PLATFORM_INFO['system']} - using native mode")
 
 except ImportError as e:
@@ -119,7 +125,7 @@ except ImportError as e:
     else:
         error_msg += "\nInstall with: pip install pydantic"
     
-    raise ImportError(error_msg)
+    raise ImportError(error_msg) from None
 
 # Export unified interface
 __all__ = [
