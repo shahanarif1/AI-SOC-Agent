@@ -44,7 +44,7 @@ class BaseTool(ABC):
         pass
     
     @api_error_handler(context={"tool_category": "base"})
-    def handle_tool_call(self, name: str, arguments: Dict[str, Any]) -> Any:
+    async def handle_tool_call(self, name: str, arguments: Dict[str, Any]) -> Any:
         """Handle a tool call by dispatching to the appropriate handler.
         
         Args:
@@ -60,7 +60,7 @@ class BaseTool(ABC):
             raise ValueError(f"Unknown tool: {name}")
         
         handler = handler_mapping[name]
-        return handler(arguments)
+        return await handler(arguments)
     
     def _format_response(self, data: Any, success: bool = True, 
                         metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

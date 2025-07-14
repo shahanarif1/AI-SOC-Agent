@@ -6,7 +6,6 @@ Handles cross-platform execution and robust import path resolution.
 
 import asyncio
 import sys
-import os
 from pathlib import Path
 
 # Get project root for .env file loading

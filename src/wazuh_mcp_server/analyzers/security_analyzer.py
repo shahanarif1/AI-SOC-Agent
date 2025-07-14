@@ -10,7 +10,6 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from enum import Enum
 import sys
-import os
 
 # Clean import within the package
 from wazuh_mcp_server.utils.logging import get_logger
