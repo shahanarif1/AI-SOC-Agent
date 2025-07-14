@@ -1853,7 +1853,14 @@ class WazuhMCPServer:
                     # Apply timeout to all tool executions
                     timeout = self.config.request_timeout_seconds * 2  # Double timeout for complex operations
                     
-                    if name == "get_alerts":
+                    # First check if the tool can be handled by the new tool factory
+                    if self.tool_factory and self.tool_factory.is_tool_available(name):
+                        result = await asyncio.wait_for(
+                            self.tool_factory.handle_tool_call(name, arguments), 
+                            timeout=timeout
+                        )
+                    # Legacy tool handling for backward compatibility
+                    elif name == "get_alerts":
                         result = await asyncio.wait_for(self._handle_get_alerts(arguments), timeout=timeout)
                     elif name == "analyze_threats":
                         result = await asyncio.wait_for(self._handle_analyze_threats(arguments), timeout=timeout)
@@ -1879,26 +1886,6 @@ class WazuhMCPServer:
                         result = await asyncio.wait_for(self._handle_get_wazuh_manager_error_logs(arguments), timeout=timeout)
                     elif name == "get_cluster_health":
                         result = await asyncio.wait_for(self._handle_get_cluster_health(arguments), timeout=timeout)
-                    elif name == "get_wazuh_alert_summary":
-                        result = await asyncio.wait_for(self._handle_get_wazuh_alert_summary(arguments), timeout=timeout)
-                    elif name == "get_wazuh_vulnerability_summary":
-                        result = await asyncio.wait_for(self._handle_get_wazuh_vulnerability_summary(arguments), timeout=timeout)
-                    elif name == "get_wazuh_critical_vulnerabilities":
-                        result = await asyncio.wait_for(self._handle_get_wazuh_critical_vulnerabilities(arguments), timeout=timeout)
-                    elif name == "get_wazuh_running_agents":
-                        result = await asyncio.wait_for(self._handle_get_wazuh_running_agents(arguments), timeout=timeout)
-                    elif name == "get_wazuh_rules_summary":
-                        result = await asyncio.wait_for(self._handle_get_wazuh_rules_summary(arguments), timeout=timeout)
-                    elif name == "get_wazuh_weekly_stats":
-                        result = await asyncio.wait_for(self._handle_get_wazuh_weekly_stats(arguments), timeout=timeout)
-                    elif name == "get_wazuh_remoted_stats":
-                        result = await asyncio.wait_for(self._handle_get_wazuh_remoted_stats(arguments), timeout=timeout)
-                    elif name == "get_wazuh_log_collector_stats":
-                        result = await asyncio.wait_for(self._handle_get_wazuh_log_collector_stats(arguments), timeout=timeout)
-                    elif name == "get_wazuh_cluster_health":
-                        result = await asyncio.wait_for(self._handle_get_wazuh_cluster_health(arguments), timeout=timeout)
-                    elif name == "get_wazuh_cluster_nodes":
-                        result = await asyncio.wait_for(self._handle_get_wazuh_cluster_nodes(arguments), timeout=timeout)
                     else:
                         raise ValueError(f"Unknown tool: {name}")
                     

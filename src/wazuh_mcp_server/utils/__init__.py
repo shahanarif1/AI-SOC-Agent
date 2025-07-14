@@ -98,6 +98,16 @@ def validate_agent_ports_query(query):
     """Fallback validation for agent ports queries."""
     return query if isinstance(query, dict) else {}
 
+def validate_time_range(time_range):
+    """Fallback validation for time range values."""
+    if isinstance(time_range, int) and time_range > 0:
+        return time_range
+    return 3600  # Default to 1 hour
+
+def validate_agent_id(agent_id):
+    """Fallback validation for agent ID."""
+    return str(agent_id) if agent_id else None
+
 try:
     from .rate_limiter import global_rate_limiter, RateLimitConfig
 except ImportError:
@@ -155,6 +165,8 @@ __all__ = [
     "validate_manager_error_logs_query",
     "validate_agent_processes_query",
     "validate_agent_ports_query",
+    "validate_time_range",
+    "validate_agent_id",
     "global_rate_limiter",
     "RateLimitConfig",
 ]

@@ -8,7 +8,6 @@ from urllib.parse import urljoin
 import aiohttp
 import json
 import sys
-import os
 
 # Clean imports within the package
 from wazuh_mcp_server.config import WazuhConfig

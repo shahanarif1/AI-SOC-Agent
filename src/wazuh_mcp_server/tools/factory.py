@@ -4,6 +4,10 @@ from typing import Dict, List, Any
 import mcp.types as types
 
 from .alerts import AlertTools
+from .statistics import StatisticsTools
+from .vulnerabilities import VulnerabilityTools
+from .agents import AgentTools
+from .cluster import ClusterTools
 from ..utils.logging import get_logger
 
 
@@ -26,6 +30,10 @@ class ToolFactory:
         try:
             # Initialize tool categories
             self._tools['alerts'] = AlertTools(self.server)
+            self._tools['statistics'] = StatisticsTools(self.server)
+            self._tools['vulnerabilities'] = VulnerabilityTools(self.server)
+            self._tools['agents'] = AgentTools(self.server)
+            self._tools['cluster'] = ClusterTools(self.server)
             
             self.logger.info(f"Initialized {len(self._tools)} tool categories")
             
@@ -52,7 +60,7 @@ class ToolFactory:
         
         return all_tools
     
-    def handle_tool_call(self, name: str, arguments: Dict[str, Any]) -> Any:
+    async def handle_tool_call(self, name: str, arguments: Dict[str, Any]) -> Any:
         """Handle a tool call by finding the appropriate handler.
         
         Args:
@@ -71,7 +79,7 @@ class ToolFactory:
                 handler_mapping = tool_instance.get_handler_mapping()
                 if name in handler_mapping:
                     self.logger.debug(f"Handling tool '{name}' with {category_name} category")
-                    return tool_instance.handle_tool_call(name, arguments)
+                    return await tool_instance.handle_tool_call(name, arguments)
             except Exception as e:
                 self.logger.error(f"Error checking {category_name} for tool {name}: {str(e)}")
                 continue

@@ -14,7 +14,6 @@ import platform
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 import sys
-import os
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
