@@ -16,20 +16,79 @@ def detect_platform() -> dict:
     
     system = platform.system().lower()
     
-    # Detect if we're on Fedora
+    # Enhanced Linux distribution detection
     is_fedora = False
+    is_debian = False
+    is_ubuntu = False
+    is_centos = False
+    is_rhel = False
+    distro_name = 'unknown'
+    
     if system == 'linux':
         try:
+            # Read /etc/os-release for modern distributions
             with open('/etc/os-release', 'r') as f:
                 content = f.read().lower()
-                is_fedora = 'fedora' in content or 'red hat' in content
+                
+                # Fedora family detection
+                if any(x in content for x in ['fedora', 'red hat', 'rhel', 'centos']):
+                    is_fedora = True
+                    if 'fedora' in content:
+                        distro_name = 'fedora'
+                    elif 'red hat' in content or 'rhel' in content:
+                        distro_name = 'rhel'
+                        is_rhel = True
+                    elif 'centos' in content:
+                        distro_name = 'centos'
+                        is_centos = True
+                
+                # Debian family detection
+                elif any(x in content for x in ['debian', 'ubuntu']):
+                    is_debian = True
+                    if 'ubuntu' in content:
+                        distro_name = 'ubuntu'
+                        is_ubuntu = True
+                    elif 'debian' in content:
+                        distro_name = 'debian'
+                
         except (FileNotFoundError, PermissionError):
-            # Fallback check for Fedora-specific paths
-            is_fedora = any([
-                os.path.exists('/etc/fedora-release'),
-                os.path.exists('/etc/redhat-release'),
-                'fedora' in platform.platform().lower()
-            ])
+            # Fallback checks using legacy files and paths
+            if any(os.path.exists(f) for f in ['/etc/fedora-release', '/etc/redhat-release']):
+                is_fedora = True
+                if os.path.exists('/etc/fedora-release'):
+                    distro_name = 'fedora'
+                elif os.path.exists('/etc/redhat-release'):
+                    try:
+                        with open('/etc/redhat-release', 'r') as f:
+                            content = f.read().lower()
+                            if 'centos' in content:
+                                distro_name = 'centos'
+                                is_centos = True
+                            else:
+                                distro_name = 'rhel'
+                                is_rhel = True
+                    except:
+                        distro_name = 'rhel'
+            
+            elif any(os.path.exists(f) for f in ['/etc/debian_version', '/etc/lsb-release']):
+                is_debian = True
+                # Check if it's Ubuntu specifically
+                platform_str = platform.platform().lower()
+                if 'ubuntu' in platform_str:
+                    distro_name = 'ubuntu'
+                    is_ubuntu = True
+                else:
+                    distro_name = 'debian'
+            
+            # Final fallback using platform string
+            platform_str = platform.platform().lower()
+            if 'fedora' in platform_str:
+                is_fedora = True
+                distro_name = 'fedora'
+            elif 'ubuntu' in platform_str:
+                is_debian = True
+                is_ubuntu = True
+                distro_name = 'ubuntu'
     
     # Check Pydantic version
     pydantic_version = None
@@ -44,8 +103,13 @@ def detect_platform() -> dict:
     return {
         'system': system,
         'is_fedora': is_fedora,
+        'is_debian': is_debian,
+        'is_ubuntu': is_ubuntu,
+        'is_centos': is_centos,
+        'is_rhel': is_rhel,
         'is_macos': system == 'darwin',
-        'is_ubuntu': 'ubuntu' in platform.platform().lower(),
+        'is_windows': system == 'windows',
+        'distro_name': distro_name,
         'pydantic_version': pydantic_version,
         'pydantic_v2': pydantic_v2,
         'platform_string': platform.platform()
@@ -57,8 +121,16 @@ PLATFORM_INFO = detect_platform()
 def log_platform_info():
     """Log platform detection results for debugging."""
     logging.info(f"Platform detected: {PLATFORM_INFO}")
+    
+    # Platform-specific warnings and recommendations
     if PLATFORM_INFO['is_fedora'] and PLATFORM_INFO['pydantic_v2']:
-        logging.warning("Fedora with Pydantic V2 detected - using compatibility mode")
+        logging.warning(f"Fedora family ({PLATFORM_INFO['distro_name']}) with Pydantic V2 detected - using compatibility mode")
+    elif PLATFORM_INFO['is_debian'] and PLATFORM_INFO['pydantic_v2']:
+        logging.info(f"Debian family ({PLATFORM_INFO['distro_name']}) with Pydantic V2 detected - using optimized mode")
+    elif PLATFORM_INFO['is_macos']:
+        logging.info(f"macOS detected - using native compatibility mode")
+    elif PLATFORM_INFO['is_windows']:
+        logging.info(f"Windows detected - using cross-platform compatibility mode")
 
 # Log platform info for debugging
 log_platform_info()
@@ -140,22 +212,32 @@ try:
                 'extra': 'forbid'
             }
             
-        # Fedora-specific warning
+        # Platform-specific warnings and recommendations
         if PLATFORM_INFO['is_fedora']:
             warnings.warn(
-                "Fedora with Pydantic V2 detected. Using compatibility mode. "
+                f"Fedora family ({PLATFORM_INFO['distro_name']}) with Pydantic V2 detected. Using compatibility mode. "
                 "For better performance, consider using Pydantic V1: "
-                "pip install 'pydantic>=1.10.0,<2.0.0'",
+                "sudo dnf install python3-pydantic or pip install 'pydantic>=1.10.0,<2.0.0'",
                 UserWarning
             )
+        elif PLATFORM_INFO['is_debian']:
+            logging.info(f"Debian family ({PLATFORM_INFO['distro_name']}) with Pydantic V2 - using optimized compatibility mode")
     
     else:
         # Pydantic V1 - Use directly  
         from pydantic import BaseModel, Field, validator
         ValidationInfo = None
         
-        # Log success for non-Fedora systems
-        if not PLATFORM_INFO['is_fedora']:
+        # Log success for different platform families
+        if PLATFORM_INFO['is_fedora']:
+            logging.info(f"Pydantic V1 detected on {PLATFORM_INFO['distro_name']} (Fedora family) - using native mode")
+        elif PLATFORM_INFO['is_debian']:
+            logging.info(f"Pydantic V1 detected on {PLATFORM_INFO['distro_name']} (Debian family) - using native mode")
+        elif PLATFORM_INFO['is_macos']:
+            logging.info(f"Pydantic V1 detected on macOS - using native mode")
+        elif PLATFORM_INFO['is_windows']:
+            logging.info(f"Pydantic V1 detected on Windows - using native mode")
+        else:
             logging.info(f"Pydantic V1 detected on {PLATFORM_INFO['system']} - using native mode")
 
 except ImportError as e:
@@ -180,13 +262,22 @@ except ImportError as e:
     ValidationInfo = None
     
     # Error message with platform-specific guidance
-    error_msg = f"Pydantic is required but not installed on {PLATFORM_INFO['system']}"
+    error_msg = f"Pydantic is required but not installed on {PLATFORM_INFO['distro_name'] or PLATFORM_INFO['system']}"
+    
     if PLATFORM_INFO['is_fedora']:
-        error_msg += "\nFor Fedora, install with: sudo dnf install python3-pydantic or pip install pydantic"
-    elif PLATFORM_INFO['is_ubuntu']:
-        error_msg += "\nFor Ubuntu, install with: sudo apt install python3-pydantic or pip install pydantic"
+        if PLATFORM_INFO['distro_name'] == 'fedora':
+            error_msg += "\nFor Fedora: sudo dnf install python3-pydantic or pip install pydantic"
+        elif PLATFORM_INFO['distro_name'] in ['rhel', 'centos']:
+            error_msg += f"\nFor {PLATFORM_INFO['distro_name'].upper()}: sudo yum install python3-pip && pip install pydantic"
+    elif PLATFORM_INFO['is_debian']:
+        if PLATFORM_INFO['distro_name'] == 'ubuntu':
+            error_msg += "\nFor Ubuntu: sudo apt install python3-pydantic or pip install pydantic"
+        elif PLATFORM_INFO['distro_name'] == 'debian':
+            error_msg += "\nFor Debian: sudo apt install python3-pydantic or pip install pydantic"
     elif PLATFORM_INFO['is_macos']:
-        error_msg += "\nFor macOS, install with: pip install pydantic"
+        error_msg += "\nFor macOS: pip install pydantic or brew install python && pip install pydantic"
+    elif PLATFORM_INFO['is_windows']:
+        error_msg += "\nFor Windows: pip install pydantic"
     else:
         error_msg += "\nInstall with: pip install pydantic"
     

@@ -597,6 +597,62 @@ def main() -> int:
     print_info(f"Package Manager: {system_info.get('package_manager', 'None detected')}")
     print()
     
+    # Check for platform-specific installers
+    script_dir = Path(__file__).parent
+    platform_scripts = {
+        'Windows': script_dir / 'install_windows.bat',
+        'Darwin': script_dir / 'install_macos.sh',
+        'Linux': None  # Will be determined based on distribution
+    }
+    
+    # For Linux, determine the appropriate script
+    if system_info['os'] == 'Linux':
+        if system_info.get('package_manager') in ['apt']:
+            platform_scripts['Linux'] = script_dir / 'install_debian.sh'
+        elif system_info.get('package_manager') in ['dnf', 'yum']:
+            platform_scripts['Linux'] = script_dir / 'install_fedora.sh'
+    
+    # Check if platform-specific script exists and offer to use it
+    platform_script = platform_scripts.get(system_info['os'])
+    if platform_script and platform_script.exists():
+        print_info(f"Platform-specific installer available: {platform_script.name}")
+        print_info("This installer is optimized for your operating system and includes:")
+        if system_info['os'] == 'Windows':
+            print("   • Windows-specific dependency handling")
+            print("   • Batch script automation")
+            print("   • Windows PATH configuration")
+        elif system_info['os'] == 'Darwin':
+            print("   • Homebrew integration")
+            print("   • Xcode Command Line Tools check")
+            print("   • Apple Silicon / Intel Mac optimization")
+            print("   • Claude Desktop integration setup")
+        elif system_info['os'] == 'Linux':
+            if 'debian' in platform_script.name:
+                print("   • APT package manager integration")
+                print("   • Debian/Ubuntu system packages")
+                print("   • Repository management")
+            elif 'fedora' in platform_script.name:
+                print("   • DNF/YUM package manager integration") 
+                print("   • EPEL repository setup")
+                print("   • SELinux considerations")
+        
+        print()
+        response = input(f"{Colors.CYAN}Use platform-specific installer? (Y/n): {Colors.END}").strip().lower()
+        if response in ['', 'y', 'yes']:
+            print_info(f"Launching platform-specific installer: {platform_script.name}")
+            try:
+                if system_info['os'] == 'Windows':
+                    os.system(f'"{platform_script}"')
+                else:
+                    os.system(f'bash "{platform_script}"')
+                return 0
+            except Exception as e:
+                print_error(f"Platform-specific installer failed: {e}")
+                print_info("Falling back to universal installer...")
+        else:
+            print_info("Continuing with universal installer...")
+        print()
+    
     # Setup steps with enhanced error handling
     setup_steps = [
         ("Checking Python compatibility", lambda: check_python_version()),
