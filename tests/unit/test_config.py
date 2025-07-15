@@ -3,7 +3,12 @@
 import os
 import pytest
 from unittest.mock import patch
-from pydantic import ValidationError
+try:
+    from pydantic import ValidationError
+except ImportError:
+    # Fallback for compatibility
+    class ValidationError(Exception):
+        pass
 
 from src.config import WazuhConfig, ConfigurationError
 
