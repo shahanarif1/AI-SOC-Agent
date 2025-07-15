@@ -1,14 +1,12 @@
 """
-Comprehensive Pydantic V1/V2 compatibility for v1.0.1 hotfix.
-Specifically designed for Fedora compatibility while maintaining macOS/Ubuntu functionality.
+Comprehensive Pydantic V1/V2 compatibility layer.
+Specifically designed for cross-platform compatibility while maintaining functionality.
 """
 
 import sys
 import warnings
 import logging
 from typing import Any, Callable, Dict, Optional, Type, Union
-
-from .platform_utils import get_environment_variable
 
 # Platform detection for compatibility
 def detect_platform() -> dict:
