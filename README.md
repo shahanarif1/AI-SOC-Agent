@@ -16,11 +16,11 @@ A Model Context Protocol (MCP) server that connects Wazuh SIEM with Claude Deskt
 
 ## ✨ What's Coming in v2.0.0 (Future Release)
 
-🎯 **Enhanced Capabilities**: 23 powerful tools (109% increase from v1.0.0)  
+🎯 **Enhanced Capabilities**: 23 powerful tools (109% increase from v1.0.1)  
 🧠 **Phase 5 Prompt Enhancement System**: Advanced context aggregation and adaptive responses  
 🔧 **Production-Ready**: Robust error handling, memory management, and cross-platform support  
 🏗️ **Modular Architecture**: Clean, maintainable codebase with standardized patterns  
-🚀 **Migration Support**: Seamless upgrade from v1.0.0 with automated migration tools  
+🚀 **Migration Support**: Seamless upgrade from v1.0.1 with automated migration tools  
 
 ## 🏷️ Version Information
 
@@ -30,49 +30,42 @@ A Model Context Protocol (MCP) server that connects Wazuh SIEM with Claude Deskt
 - **Best For**: Developers and early adopters who want to test upcoming features
 - **Stability**: Under active development - use for testing purposes only
 
-### **Stable Release: v1.0.0** 
-- **Status**: ✅ **Production Stable** - [GitHub Release](https://github.com/gensecaihq/Wazuh-MCP-Server/releases/tag/v1.0.0)
+### **Stable Release: v1.0.1** 
+- **Status**: ✅ **Production Stable** - [GitHub Release](https://github.com/gensecaihq/Wazuh-MCP-Server/releases/tag/v1.0.1)
 - **Tools**: 11 core security tools covering essential operations
 - **Best For**: Production environments requiring maximum stability
-- **Download**: Go to [Releases](https://github.com/gensecaihq/Wazuh-MCP-Server/releases) and download v1.0.0
-- **Documentation**: [v1.0.0 README](https://github.com/gensecaihq/Wazuh-MCP-Server/blob/v1.0.0/README.md)
+- **Download**: Go to [Releases](https://github.com/gensecaihq/Wazuh-MCP-Server/releases) and download v1.0.1
+- **Documentation**: [v1.0.1 README](https://github.com/gensecaihq/Wazuh-MCP-Server/blob/v1.0.1/README.md)
 
-> **💡 Recommendation**: Use **v1.0.0 release** for all production systems. The **main branch (v2.0.0-dev)** is for testing and development only - it will be released after thorough testing and validation.
+> **💡 Recommendation**: Use **v1.0.1 release** for all production systems. The **main branch (v2.0.0-dev)** is for testing and development only - it will be released after thorough testing and validation.
 
 <h2>🙏 Special Thanks</h2>
 <p>Big shout-out to <strong><a href="https://github.com/marcolinux46">@marcolinux46</a></strong> for tireless testing, detailed feedback, and reporting edge-case Wazuh issues round the clock.</p>
 
 ## Quick Setup
 
-> **Choose Your Version First**: See [Version Information](#️-version-information) above to choose between v1.0.0 (production stable) or main branch (v2.0.0-dev testing only).
-
+> **Choose Your Version First**: See [Version Information](#️-version-information) above to choose between v1.0.1(production stable)
 ### 1. Install
 
-**For v2.0.0-dev Main Branch (Testing/Development Only):**
-```bash
-git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
-cd Wazuh-MCP-Server
-python3 scripts/install.py
-```
 
-**For v1.0.0 (Production Stable):**
+**For v1.0.1 (Production Stable):**
 1. Go to [Releases](https://github.com/gensecaihq/Wazuh-MCP-Server/releases)
-2. Download v1.0.0 source code (zip/tar.gz)
+2. Download v1.0.1 source code (zip/tar.gz)
 3. Extract and install:
 ```bash
-cd Wazuh-MCP-Server-1.0.0
+cd Wazuh-MCP-Server-1.0.1
 python3 install.py
 ```
 
-**Alternative - Clone v1.0.0 tag:**
+**Alternative - Clone v1.0.1 tag:**
 ```bash
-git clone -b v1.0.0 https://github.com/gensecaihq/Wazuh-MCP-Server.git
+git clone -b v1.0.1 https://github.com/gensecaihq/Wazuh-MCP-Server.git
 cd Wazuh-MCP-Server
 python3 install.py
 ```
 
-> **📁 Note**: v1.0.0 uses `install.py` in the root directory, while main branch (v2.0.0-dev) uses `scripts/install.py` due to improved organization.  
-> **⚠️ Important**: Main branch is under active development. Use v1.0.0 release for production systems.
+> **📁 Note**: v1.0.1 uses `install.py` in the root directory, while main branch (v2.0.0-dev) uses `scripts/install.py` due to improved organization.  
+> **⚠️ Important**: Main branch is under active development. Use v1.0.1 release for production systems.
 
 ### 2. Configure
 
@@ -336,7 +329,7 @@ WAZUH_ALLOW_SELF_SIGNED=true
 - [Usage Examples](examples/basic_usage.py) - Code examples and queries
 
 ### 🚀 Release Information
-- [Migration Guide](docs/MIGRATION_GUIDE.md) - Future upgrade path from v1.0.0 to v2.0.0 (when released)
+- [Migration Guide](docs/MIGRATION_GUIDE.md) - Future upgrade path from v1.0.1 to v2.0.0 (when released)
 - [What's Coming](docs/releases/UPCOMING.md) - Planned v2.0.0 features and enhancements
 
 ## Support
