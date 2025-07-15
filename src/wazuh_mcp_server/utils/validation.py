@@ -4,7 +4,7 @@ import re
 import ipaddress
 import hashlib
 from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, Field, validator
+from .pydantic_compat import BaseModel, Field, validator
 # Security manager functionality moved to error recovery system
 
 
@@ -119,7 +119,9 @@ class AlertSummaryQuery(BaseModel):
             # Basic ISO format validation
             import re
             if not re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}', v):
-                raise ValueError(f"{field.name} must be in ISO format (YYYY-MM-DDTHH:MM:SS)")
+                # Use field name directly for compatibility
+                field_name = getattr(field, 'name', 'custom_time')
+                raise ValueError(f"{field_name} must be in ISO format (YYYY-MM-DDTHH:MM:SS)")
         return v
     
     @validator('severity_filter')
