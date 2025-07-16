@@ -20,42 +20,80 @@ A **local Model Context Protocol (MCP) server** that connects Wazuh SIEM with Cl
 
 ## 🏷️ Version Information
 
-### **📍 Current Release: v2.0.0** (This Branch - **main**)
-- **Status**: ✅ **PRODUCTION READY** - Current stable release
+### **✅ v1.0.1 - Most Stable Release** (Recommended for Production)
+- **Status**: ✅ **MOST STABLE** - [GitHub Release](https://github.com/gensecaihq/Wazuh-MCP-Server/releases/tag/v1.0.1)
 - **Architecture**: **Local MCP Server** with **stdio transport**
-- **Deployment**: Traditional Python installation on your local machine
-- **Transport**: stdio only (direct connection to Claude Desktop)
-- **Features**: 26 security tools with enhanced capabilities
-- **Best For**: **Current users** - Production environments, development, and daily use
-- **Installation**: Simple Python setup with dependency management
+- **Features**: 11 core security tools covering essential operations
+- **Best For**: **Production environments** requiring maximum stability and reliability
+- **Download**: Go to [Releases](https://github.com/gensecaihq/Wazuh-MCP-Server/releases) and download v1.0.1
+- **Documentation**: [v1.0.1 README](https://github.com/gensecaihq/Wazuh-MCP-Server/blob/v1.0.1/README.md)
 
-### **🚀 Coming Soon: v3.0.0** (v3-check branch)
-- **Status**: 🔜 **COMING SOON** - Advanced containerized version
+### **🚀 Main Branch - Advanced Tools** (This Branch)
+- **Status**: 🧪 **ADVANCED TESTING** - For users who want to try advanced tools
+- **Architecture**: **Local MCP Server** with **stdio transport**
+- **Features**: 26 security tools with enhanced capabilities (109% more than v1.0.1)
+- **Best For**: **Power users** who want to test advanced features and tools
+- **Stability**: More features but potentially less stable than v1.0.1
+- **Installation**: Available on this branch for testing
+
+### **🔬 v3-check Branch - Future WIP** (For Brave Early Adopters)
+- **Status**: 🔬 **WORK IN PROGRESS** - For users who dare to try future features
 - **Architecture**: **Remote MCP Server** with **HTTP/SSE transport**
 - **Deployment**: Docker containerization with complete orchestration
 - **Transport**: HTTP/HTTPS + Server-Sent Events (SSE)
-- **Features**: All v2 features + OAuth2, monitoring, high availability
-- **Best For**: **Future users** - Enterprise deployments, cloud environments
+- **Features**: All main branch features + OAuth2, monitoring, high availability
+- **Best For**: **Early adopters** who want to test cutting-edge remote MCP capabilities
 - **Preview**: Available on [v3-check branch](https://github.com/gensecaihq/Wazuh-MCP-Server/tree/v3-check)
 
-> **💡 Current Recommendation**: Use **v2.0.0 (this branch)** for immediate deployment. **v3.0.0** will be available soon for users who need remote/enterprise features.
+> **💡 Recommendation Guide**:
+> - **Production Use**: Use **v1.0.1 release** for maximum stability
+> - **Advanced Tools**: Use **main branch** if you want more security tools and features
+> - **Future Features**: Use **v3-check branch** if you dare to try remote MCP server capabilities
 
 ---
 
-## 🚀 Quick Start (v2.0.0)
+## 🚀 Quick Start
 
-### 1. Installation
+> **Choose Your Version First**: See [Version Information](#️-version-information) above to choose between v1.0.1 (most stable), main branch (advanced tools), or v3-check (future WIP).
 
+### 📋 Installation Options
+
+#### ✅ **Option 1: v1.0.1 - Most Stable** (Recommended for Production)
+```bash
+# Download from GitHub Releases
+# Go to: https://github.com/gensecaihq/Wazuh-MCP-Server/releases/tag/v1.0.1
+# Download and extract the source code
+
+# OR clone the specific tag
+git clone -b v1.0.1 https://github.com/gensecaihq/Wazuh-MCP-Server.git
+cd Wazuh-MCP-Server
+python3 install.py  # Note: v1.0.1 uses root-level install.py
+```
+
+#### 🧪 **Option 2: Main Branch - Advanced Tools** (This Branch)
 ```bash
 # Clone the repository
 git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
 cd Wazuh-MCP-Server
 
-# Ensure you're on the main branch (v2.0.0)
+# Ensure you're on the main branch
 git checkout main
 
-# Install dependencies
-python3 scripts/install.py
+# Install dependencies  
+python3 scripts/install.py  # Note: main branch uses scripts/install.py
+```
+
+#### 🔬 **Option 3: v3-check Branch - Future WIP** (For Brave Users)
+```bash
+# Clone and switch to v3-check
+git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
+cd Wazuh-MCP-Server
+git checkout v3-check
+
+# Docker deployment (no Python setup needed)
+cp .env.example .env
+# Edit .env with your Wazuh details
+docker compose up -d
 ```
 
 ### 2. Configuration
@@ -146,9 +184,14 @@ curl -u username:password https://your-wazuh:55000/
 
 ---
 
-## 🎯 Features (v2.0.0)
+## 🎯 Features by Version
 
-### 🛡️ Security Tools (26 Total)
+### 🛡️ Security Tools by Version
+- **v1.0.1 (Stable)**: 11 core security tools
+- **Main Branch (Advanced)**: 26 security tools (109% more than v1.0.1)
+- **v3-check (WIP)**: All main branch tools + remote capabilities
+
+### 🧪 Main Branch Features (26 Total Tools)
 - **get_alerts**: Retrieve and filter Wazuh alerts with advanced filtering
 - **analyze_threats**: AI-powered threat analysis and recommendations
 - **check_agent_health**: Comprehensive agent status monitoring
@@ -263,19 +306,20 @@ chmod +x scripts/mcp_wrapper.sh
 
 ---
 
-## 📊 Architecture Comparison
+## 📊 Version Comparison
 
-| Feature | v2.0.0 (Current - stdio) | v3.0.0 (Coming - SSE/Docker) |
-|---------|---------------------------|-------------------------------|
-| **Transport** | stdio (local only) | HTTP/HTTPS + SSE (remote) |
-| **Deployment** | Python installation | Docker containers |
-| **Setup** | Traditional pip/python | Single `docker compose up` |
-| **Dependencies** | Host Python environment | All containerized |
-| **Authentication** | Basic | OAuth2 + JWT |
-| **Monitoring** | Basic logging | Prometheus + Grafana |
-| **Scaling** | Single instance | Horizontal scaling |
-| **Best For** | Current production use | Future enterprise deployments |
-| **OS Requirements** | Python 3.9+ | Docker only |
+| Feature | v1.0.1 (Stable) | Main Branch (Advanced) | v3-check (WIP) |
+|---------|------------------|-------------------------|-----------------|
+| **Status** | ✅ Most Stable | 🧪 Advanced Testing | 🔬 Work in Progress |
+| **Tools** | 11 core tools | 26 tools (109% more) | 26 tools + remote |
+| **Transport** | stdio (local) | stdio (local) | HTTP/HTTPS + SSE (remote) |
+| **Deployment** | Python install | Python install | Docker containers |
+| **Setup** | `install.py` | `scripts/install.py` | `docker compose up` |
+| **Dependencies** | Host Python | Host Python | All containerized |
+| **Authentication** | Basic | Basic | OAuth2 + JWT |
+| **Monitoring** | Basic logging | Basic logging | Prometheus + Grafana |
+| **Best For** | Production use | Power users | Early adopters |
+| **Stability** | Highest | Medium | Experimental |
 
 ---
 
@@ -312,20 +356,32 @@ chmod +x scripts/mcp_wrapper.sh
 
 ## 📊 Project Status
 
-- **Current Version**: v2.0.0 (Production Ready)
-- **Next Version**: v3.0.0 (Coming Soon - Docker/SSE)
+- **Stable Release**: v1.0.1 (Most Stable - Recommended for Production)
+- **Advanced Branch**: main (Advanced Tools - For Power Users)
+- **Future Branch**: v3-check (Work in Progress - For Early Adopters)
 - **Maintenance**: Active development and support
 - **Compatibility**: Python 3.9+ | Wazuh 4.8+ | Claude Desktop
 - **Platforms**: Windows, macOS, Linux
 - **License**: MIT License
 
-## 🎯 Why Choose v2.0.0 Now?
+## 🎯 Which Version Should You Choose?
 
-✅ **Ready Today**: Production-ready with immediate deployment  
-✅ **Simple Setup**: Traditional Python installation - no Docker required  
-✅ **Proven Stable**: Mature stdio transport with reliable Claude Desktop integration  
-✅ **Full Featured**: 26 powerful security tools for comprehensive analysis  
-✅ **Universal**: Works on any system with Python 3.9+  
-✅ **No Network Config**: Direct stdio connection - no ports or networking setup  
+### ✅ **Choose v1.0.1 if you want:**
+✅ **Maximum Stability**: Thoroughly tested and stable  
+✅ **Production Ready**: Proven in production environments  
+✅ **11 Core Tools**: Essential security monitoring capabilities  
+✅ **Rock Solid**: No experimental features, just reliable functionality  
 
-**Perfect for**: Current production deployments, development environments, and users who need immediate access to AI-powered Wazuh analysis.
+### 🧪 **Choose Main Branch if you want:**
+🧪 **Advanced Tools**: 26 security tools (109% more than v1.0.1)  
+🧪 **Latest Features**: Enhanced AI analysis and advanced capabilities  
+🧪 **Power User Features**: More sophisticated security operations  
+🧪 **Testing Environment**: Willing to help test advanced features  
+
+### 🔬 **Choose v3-check if you dare:**
+🔬 **Cutting Edge**: Remote MCP server with HTTP/SSE transport  
+🔬 **Docker Native**: Complete containerization with monitoring  
+🔬 **OAuth2 Security**: Enterprise-grade authentication  
+🔬 **Early Adopter**: Want to test future capabilities  
+
+**Production Recommendation**: Use **v1.0.1** for production, **main branch** for advanced testing, **v3-check** for future exploration.
