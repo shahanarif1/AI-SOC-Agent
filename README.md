@@ -3,108 +3,105 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Wazuh Compatible](https://img.shields.io/badge/Wazuh-4.8%2B-orange.svg)](https://wazuh.com/)
+[![Current Release](https://img.shields.io/badge/Release-v2.0.0-green.svg)](https://github.com/gensecaihq/Wazuh-MCP-Server/releases)
 
-A Model Context Protocol (MCP) server that connects Wazuh SIEM with Claude Desktop for AI-powered security operations.
+A **local Model Context Protocol (MCP) server** that connects Wazuh SIEM with Claude Desktop for AI-powered security operations using **stdio transport**.
 
 ## What it does
 
-- **Security Monitoring**: Query Wazuh alerts, agents, and vulnerabilities through Claude
-- **AI Analysis**: Get AI-powered security insights, threat analysis, and compliance reports
-- **Natural Language**: Ask questions like "Show me critical alerts from the last hour" or "Analyze this security incident"
+- **🔍 Security Monitoring**: Query Wazuh alerts, agents, and vulnerabilities through Claude
+- **🧠 AI Analysis**: Get AI-powered security insights, threat analysis, and compliance reports
+- **💬 Natural Language**: Ask questions like "Show me critical alerts from the last hour" or "Analyze this security incident"
+- **📱 Local Integration**: Direct stdio connection with Claude Desktop - no network setup required
 
 <img width="797" height="568" alt="claude0mcp-wazuh" src="https://github.com/user-attachments/assets/458d3c94-e1f9-4143-a1a4-85cb629287d4" />
 
-## ✨ What's Coming in v2.0.0 (Future Release)
-
-🎯 **Enhanced Capabilities**: 23 powerful tools (109% increase from v1.0.1)  
-🧠 **Phase 5 Prompt Enhancement System**: Advanced context aggregation and adaptive responses  
-🔧 **Production-Ready**: Robust error handling, memory management, and cross-platform support  
-🏗️ **Modular Architecture**: Clean, maintainable codebase with standardized patterns  
-🚀 **Migration Support**: Seamless upgrade from v1.0.1 with automated migration tools  
+---
 
 ## 🏷️ Version Information
 
-### **Current Main Branch: v2.0.0-dev** (This Branch)
-- **Status**: 🚧 **Active Development** - Main branch with latest features under development
-- **Tools**: 23 powerful security tools with advanced capabilities  
-- **Best For**: Developers and early adopters who want to test upcoming features
-- **Stability**: Under active development - use for testing purposes only
+### **📍 Current Release: v2.0.0** (This Branch - **main**)
+- **Status**: ✅ **PRODUCTION READY** - Current stable release
+- **Architecture**: **Local MCP Server** with **stdio transport**
+- **Deployment**: Traditional Python installation on your local machine
+- **Transport**: stdio only (direct connection to Claude Desktop)
+- **Features**: 26 security tools with enhanced capabilities
+- **Best For**: **Current users** - Production environments, development, and daily use
+- **Installation**: Simple Python setup with dependency management
 
-### **Stable Release: v1.0.1** 
-- **Status**: ✅ **Production Stable** - [GitHub Release](https://github.com/gensecaihq/Wazuh-MCP-Server/releases/tag/v1.0.1)
-- **Tools**: 11 core security tools covering essential operations
-- **Best For**: Production environments requiring maximum stability
-- **Download**: Go to [Releases](https://github.com/gensecaihq/Wazuh-MCP-Server/releases) and download v1.0.1
-- **Documentation**: [v1.0.1 README](https://github.com/gensecaihq/Wazuh-MCP-Server/blob/v1.0.1/README.md)
+### **🚀 Coming Soon: v3.0.0** (v3-check branch)
+- **Status**: 🔜 **COMING SOON** - Advanced containerized version
+- **Architecture**: **Remote MCP Server** with **HTTP/SSE transport**
+- **Deployment**: Docker containerization with complete orchestration
+- **Transport**: HTTP/HTTPS + Server-Sent Events (SSE)
+- **Features**: All v2 features + OAuth2, monitoring, high availability
+- **Best For**: **Future users** - Enterprise deployments, cloud environments
+- **Preview**: Available on [v3-check branch](https://github.com/gensecaihq/Wazuh-MCP-Server/tree/v3-check)
 
-> **💡 Recommendation**: Use **v1.0.1 release** for all production systems. The **main branch (v2.0.0-dev)** is for testing and development only - it will be released after thorough testing and validation.
+> **💡 Current Recommendation**: Use **v2.0.0 (this branch)** for immediate deployment. **v3.0.0** will be available soon for users who need remote/enterprise features.
 
-<h2>🙏 Special Thanks</h2>
-<p>Big shout-out to <strong><a href="https://github.com/marcolinux46">@marcolinux46</a></strong> for tireless testing, detailed feedback, and reporting edge-case Wazuh issues round the clock.</p>
+---
 
-## Quick Setup
+## 🚀 Quick Start (v2.0.0)
 
-> **Choose Your Version First**: See [Version Information](#️-version-information) above to choose between v1.0.1(production stable)
-### 1. Install
+### 1. Installation
 
-
-**For v1.0.1 (Production Stable):**
-1. Go to [Releases](https://github.com/gensecaihq/Wazuh-MCP-Server/releases)
-2. Download v1.0.1 source code (zip/tar.gz)
-3. Extract and install:
 ```bash
-cd Wazuh-MCP-Server-1.0.1
-python3 install.py
-```
-
-**Alternative - Clone v1.0.1 tag:**
-```bash
-git clone -b v1.0.1 https://github.com/gensecaihq/Wazuh-MCP-Server.git
+# Clone the repository
+git clone https://github.com/gensecaihq/Wazuh-MCP-Server.git
 cd Wazuh-MCP-Server
-python3 install.py
+
+# Ensure you're on the main branch (v2.0.0)
+git checkout main
+
+# Install dependencies
+python3 scripts/install.py
 ```
 
-> **📁 Note**: v1.0.1 uses `install.py` in the root directory, while main branch (v2.0.0-dev) uses `scripts/install.py` due to improved organization.  
-> **⚠️ Important**: Main branch is under active development. Use v1.0.1 release for production systems.
+### 2. Configuration
 
-### 2. Configure
-
-**Important**: Create a dedicated API user in Wazuh Dashboard first:
+**First, create a dedicated API user in Wazuh Dashboard:**
 
 1. Login to Wazuh Dashboard (https://your-wazuh-server:443)
-2. Go to ** Server Management ** **Security** → **Users**
-3. Click **Create user**
-4. Username: `wazuh-mcp-api` (or your preferred name)
-5. Password: Generate a strong password
-6. Backend roles: `Select Appropriate one`
+2. Go to **Security** → **Internal users**
+3. Create user with `wazuh` backend role
+4. Use these credentials (not your dashboard login)
 
-Then edit `.env` with your Wazuh details:
+**Then configure your environment:**
 
-```env
-WAZUH_HOST=your-wazuh-server.com
-WAZUH_USER=wazuh-mcp-api
-WAZUH_PASS=your-api-password
+```bash
+# Copy and edit configuration
+cp .env.example .env
+# Edit .env with your Wazuh details
 ```
 
-### 3. Add to Claude Desktop
+**Example .env configuration:**
+```env
+# Required Wazuh Configuration
+WAZUH_HOST=your-wazuh-server.com
+WAZUH_USER=your-api-username
+WAZUH_PASS=your-api-password
+WAZUH_PORT=55000
 
-First, create the configuration file in Claude Desktop:
+# Security (recommended for production)
+VERIFY_SSL=true
+WAZUH_ALLOW_SELF_SIGNED=true
 
-1. Open Claude Desktop
-2. Go to **Settings** → **Developer**
-3. Click **Edit Config** to create/open `claude_desktop_config.json`
+# Optional Performance Settings
+MAX_ALERTS_PER_QUERY=1000
+CACHE_TTL_SECONDS=300
+LOG_LEVEL=INFO
+```
 
-The configuration file location:
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Linux**: `~/.config/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+### 3. Claude Desktop Integration
 
-Add the appropriate configuration for your platform:
+**Add to Claude Desktop configuration:**
 
-### macOS/Linux Configuration
+1. Open Claude Desktop → **Settings** → **Developer**
+2. Click **Edit Config** to create/open `claude_desktop_config.json`
+3. Add the server configuration:
 
-**Recommended**: Use the wrapper script for better environment handling and compatibility.
-
+**macOS/Linux (Recommended - uses wrapper script):**
 ```json
 {
   "mcpServers": {
@@ -116,8 +113,7 @@ Add the appropriate configuration for your platform:
 }
 ```
 
-### Windows Configuration
-
+**Windows:**
 ```json
 {
   "mcpServers": {
@@ -130,213 +126,206 @@ Add the appropriate configuration for your platform:
 }
 ```
 
-**Using Virtual Environment** (recommended for Windows):
-```json
-{
-  "mcpServers": {
-    "wazuh": {
-      "command": "C:/full/path/to/Wazuh-MCP-Server/venv/Scripts/python.exe",
-      "args": ["C:/full/path/to/Wazuh-MCP-Server/src/wazuh_mcp_server/main.py", "--stdio"]
-    }
-  }
-}
+4. **Replace** `/full/path/to/Wazuh-MCP-Server` with your actual installation path
+5. **Restart Claude Desktop**
+
+### 4. Test Your Setup
+
+```bash
+# Validate configuration
+python scripts/validate_setup.py
+
+# Test Wazuh connectivity
+curl -u username:password https://your-wazuh:55000/
 ```
 
-Replace `/full/path/to/Wazuh-MCP-Server` with your actual installation path.
-
-**Note**: The configuration file is not created automatically. You must use Claude Desktop's Developer settings to create it.
-
-For detailed setup instructions, see [Claude Desktop Setup Guide](docs/user-guides/claude-desktop-setup.md).
-
-**Note**: Unix systems (macOS/Linux) use the wrapper script for optimal compatibility, while Windows uses direct Python execution.
-
-### 4. Test
-
-Restart Claude Desktop and try asking:
+**In Claude Desktop, try asking:**
 - "Show me recent security alerts"
 - "What's the status of my Wazuh agents?"
 - "Analyze security threats in the last 24 hours"
 
-## Configuration Options
+---
 
-Key environment variables in `.env`:
+## 🎯 Features (v2.0.0)
 
-```env
-# Required
-WAZUH_HOST=your-wazuh-server.com
-WAZUH_USER=your-username
-WAZUH_PASS=your-password
-
-# Optional
-WAZUH_PORT=55000
-WAZUH_INDEXER_HOST=your-indexer.com
-WAZUH_INDEXER_PORT=9200
-VERIFY_SSL=true
-DEBUG=false
-```
-
-## Features
-
-### Security Tools
-- **get_alerts**: Retrieve and filter Wazuh alerts
-- **analyze_threats**: AI-powered threat analysis
-- **check_agent_health**: Monitor agent status
-- **compliance_check**: Compliance assessments (PCI DSS, GDPR, HIPAA, etc.)
+### 🛡️ Security Tools (26 Total)
+- **get_alerts**: Retrieve and filter Wazuh alerts with advanced filtering
+- **analyze_threats**: AI-powered threat analysis and recommendations
+- **check_agent_health**: Comprehensive agent status monitoring
+- **compliance_check**: Multi-framework compliance assessments (PCI DSS, GDPR, HIPAA, NIST, ISO27001)
 - **risk_assessment**: Comprehensive security risk analysis
 - **vulnerability_prioritization**: Risk-based vulnerability management
+- **security_summary**: Executive security dashboard
+- **incident_analysis**: Structured security incident investigation
+- **threat_hunting**: Proactive threat detection strategies
+- **forensic_analysis**: Digital forensics investigation tools
+- **And 16 more specialized security tools...**
 
-### AI Prompts
-- **Security Incident Analysis**: Structured incident investigation
-- **Threat Hunting**: Proactive threat detection strategies
+### 🧠 AI-Powered Prompts
+- **Security Incident Analysis**: Structured incident investigation workflows
+- **Threat Hunting Queries**: Proactive threat detection strategies
 - **Compliance Assessment**: Framework-specific compliance analysis
-- **Forensic Analysis**: Digital forensics investigation
-- **Security Reporting**: Executive and technical security reports
+- **Executive Reporting**: High-level security summaries
+- **Technical Deep Dives**: Detailed security analysis
 
-### Real-time Features
-- **Critical Alert Notifications**: Immediate alerts for high-severity events
-- **Progress Tracking**: Real-time progress for long-running operations
-- **Agent Status Updates**: Live agent health monitoring
+### 🔄 Real-time Capabilities
+- **Live Alert Monitoring**: Immediate alerts for high-severity events
+- **Agent Status Updates**: Real-time agent health monitoring
+- **Progress Tracking**: Live progress for long-running operations
+- **Continuous Monitoring**: Background security monitoring
 
-## Troubleshooting
+---
 
-### Connection Issues
+## 🛠️ Development & Testing
+
+### Local Development
 ```bash
-# Test your setup
-python scripts/validate_setup.py
+# Setup development environment
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or
+venv\Scripts\activate     # Windows
 
-# Check Wazuh connectivity
-curl -u username:password https://your-wazuh:55000/
+# Install development dependencies
+pip install -r requirements.txt
+
+# Run tests
+pytest tests/
+
+# Start development server
+python3 -m wazuh_mcp_server.main --stdio
 ```
 
-### Authentication Issues
+### Validation Tools
+```bash
+# Test your Wazuh connection
+python scripts/test_connection.py
 
-**Problem**: "Invalid credentials" error despite correct dashboard login
+# Validate your configuration
+python scripts/validate_setup.py
 
-**Solution**: Wazuh Dashboard and API use separate authentication systems.
+# Check dependency compatibility
+python scripts/check_compatibility.py
+```
 
-1. **Create API User**:
-   - Login to Wazuh Dashboard
-   - Go to **Security** → **Internal users**
-   - Create a new user with `wazuh` backend role
-   - Use these credentials in your `.env` file
+---
 
-2. **Test API Authentication**:
-   ```bash
-   curl -k -X POST "https://your-wazuh:55000/security/user/authenticate" \
-     -H "Content-Type: application/json" \
-     -d '{"username":"your-api-user","password":"your-api-password"}'
-   ```
+## 🔧 Troubleshooting
 
-3. **Common Issues**:
-   - Dashboard credentials ≠ API credentials
-   - Default admin account may be disabled for API
-   - User must have proper backend roles assigned
+### Common Issues
 
-### Claude Desktop Issues
-- Ensure the path in claude_desktop_config.json is absolute and correct
-- The config file must be created through Claude Desktop Settings → Developer → Edit Config
-- Restart Claude Desktop after adding the server
-- Check Claude Desktop logs for errors
-- Verify the config file location:
-  - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-  - Linux: `~/.config/Claude/claude_desktop_config.json`
-  - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+#### 1. Authentication Problems
+**Problem**: "Invalid credentials" despite correct dashboard login
 
-### macOS/Linux Issues
+**Solution**: Wazuh Dashboard and API use different authentication
+- Create dedicated API user in Wazuh Dashboard
+- Use API credentials (not dashboard credentials) in `.env`
+- Ensure user has proper backend roles assigned
 
-**Problem**: "Read-only file system" errors or environment issues
+#### 2. Claude Desktop Connection Issues
+**Problem**: Server not appearing in Claude Desktop
 
-**Solution**: Use the wrapper script instead of direct Python execution:
+**Solutions**:
+- Ensure configuration file path is absolute and correct
+- Restart Claude Desktop after adding server
+- Check Claude Desktop logs for specific errors
+- Verify config file location:
+  - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+  - **Linux**: `~/.config/Claude/claude_desktop_config.json`
+  - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
-1. **Ensure wrapper script is executable**:
-   ```bash
-   chmod +x /path/to/Wazuh-MCP-Server/scripts/mcp_wrapper.sh
-   ```
-
-2. **Test the wrapper**:
-   ```bash
-   ./scripts/mcp_wrapper.sh --stdio
-   ```
-
-3. **Use wrapper in Claude Desktop config**:
-   ```json
-   {
-     "mcpServers": {
-       "wazuh": {
-         "command": "/full/path/to/Wazuh-MCP-Server/scripts/mcp_wrapper.sh",
-         "args": ["--stdio"]
-       }
-     }
-   }
-   ```
-
-**Why this is recommended**: The wrapper script handles environment setup, working directories, and temporary file creation across Unix-like systems (macOS/Linux). See [Unix Troubleshooting Guide](docs/troubleshooting/unix-troubleshooting.md) for detailed information.
-
-### SSL Issues
-
-**For production: Only If you have a proper SSL installed** (recommended):
+#### 3. SSL Certificate Issues
+**For production with proper SSL:**
 ```env
-# Use proper SSL verification with self-signed certificate support
 VERIFY_SSL=true
 WAZUH_ALLOW_SELF_SIGNED=true
 ```
 
-**For development only**:
+**For development/testing only:**
 ```env
-# Disable SSL verification completely (not recommended for production)
 VERIFY_SSL=false
 WAZUH_ALLOW_SELF_SIGNED=true
 ```
 
-> **Security Note**: `VERIFY_SSL=true` with `WAZUH_ALLOW_SELF_SIGNED=true` provides the best balance of security and compatibility.
+#### 4. Platform-Specific Issues
 
-## Platform-Specific Requirements
+**macOS/Linux**: Use the wrapper script for better environment handling
+```bash
+chmod +x scripts/mcp_wrapper.sh
+```
 
-### All Platforms
-- Python 3.9+
-- Wazuh Manager 4.8+
-- Claude Desktop
-- Network access to Wazuh API (port 55000)
-- Dedicated Wazuh API user (not dashboard credentials)
+**Windows**: Ensure Python is in PATH and use full paths in configuration
 
-### macOS/Linux
-- Bash shell (for wrapper script)
-- Write permissions for temporary directories
-- Standard development tools (gcc, make) for some dependencies
-- Execute permissions for wrapper script (`chmod +x scripts/mcp_wrapper.sh`)
+### Getting Help
+- Check [Troubleshooting Documentation](docs/troubleshooting/)
+- Review [Setup Guide](docs/user-guides/claude-desktop-setup.md)
+- Report issues on [GitHub Issues](https://github.com/gensecaihq/Wazuh-MCP-Server/issues)
 
-### Windows
-- Windows Terminal or PowerShell (recommended)
-- Visual Studio Build Tools (for some dependencies)
-- Python properly installed and in PATH
+---
 
-## Documentation
+## 📊 Architecture Comparison
 
-### 📚 User Guides
-- [Claude Desktop Setup Guide](docs/user-guides/claude-desktop-setup.md) - Complete setup instructions
-- [Unix Troubleshooting Guide](docs/troubleshooting/unix-troubleshooting.md) - macOS/Linux troubleshooting  
-- [Windows Troubleshooting Guide](docs/troubleshooting/windows-troubleshooting.md) - Windows-specific issues
+| Feature | v2.0.0 (Current - stdio) | v3.0.0 (Coming - SSE/Docker) |
+|---------|---------------------------|-------------------------------|
+| **Transport** | stdio (local only) | HTTP/HTTPS + SSE (remote) |
+| **Deployment** | Python installation | Docker containers |
+| **Setup** | Traditional pip/python | Single `docker compose up` |
+| **Dependencies** | Host Python environment | All containerized |
+| **Authentication** | Basic | OAuth2 + JWT |
+| **Monitoring** | Basic logging | Prometheus + Grafana |
+| **Scaling** | Single instance | Horizontal scaling |
+| **Best For** | Current production use | Future enterprise deployments |
+| **OS Requirements** | Python 3.9+ | Docker only |
 
-### 🔧 Technical Documentation
-- [Production Readiness Audit](docs/technical/PRODUCTION_READINESS_AUDIT.md) - Development readiness assessment
-- [Comprehensive Audit Report](docs/technical/COMPREHENSIVE_AUDIT_REPORT.md) - Complete implementation overview
-- [Phase 5 Enhancement System](docs/technical/PHASE_5_PROMPT_ENHANCEMENT_DETAILED_PLAN.md) - Advanced features
-- [Wrapper Script Documentation](docs/technical/WRAPPER_SCRIPT_DOCUMENTATION.md) - Technical details
+---
 
-### 💻 Development
-- [Contributing Guidelines](docs/development/CONTRIBUTING.md) - How to contribute
-- [Configuration Examples](examples/configuration_examples/) - Environment configurations
-- [Usage Examples](examples/basic_usage.py) - Code examples and queries
+## 📚 Documentation
 
-### 🚀 Release Information
-- [Migration Guide](docs/MIGRATION_GUIDE.md) - Future upgrade path from v1.0.1 to v2.0.0 (when released)
-- [What's Coming](docs/releases/UPCOMING.md) - Planned v2.0.0 features and enhancements
+### User Guides
+- **[Claude Desktop Setup Guide](docs/user-guides/claude-desktop-setup.md)** - Complete installation and configuration
+- **[Configuration Guide](docs/configuration/README.md)** - Environment and performance tuning
+- **[Troubleshooting Guide](docs/troubleshooting/README.md)** - Platform-specific solutions
 
-## Support
+### Technical Documentation
+- **[API Reference](docs/api/README.md)** - Complete tool and function reference
+- **[Development Guide](docs/development/README.md)** - Contributing and extending
+- **[Examples](examples/)** - Configuration examples and usage patterns
 
-- [GitHub Issues](https://github.com/gensecaihq/Wazuh-MCP-Server/issues)
-- [Documentation](docs/)
+### Version Information
+- **[Version Comparison](docs/ARCHITECTURE_COMPARISON.md)** - Detailed v2 vs v3 comparison
+- **[Migration Planning](docs/MIGRATION_GUIDE.md)** - Future v3 upgrade path
+- **[v3 Preview](https://github.com/gensecaihq/Wazuh-MCP-Server/tree/v3-check)** - Explore upcoming features
 
-## License
+---
 
-MIT License - see [LICENSE](LICENSE) file.
+## 🤝 Support & Community
+
+- **Issues**: [GitHub Issues](https://github.com/gensecaihq/Wazuh-MCP-Server/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/gensecaihq/Wazuh-MCP-Server/discussions)
+- **Documentation**: [Complete docs](docs/)
+- **Security**: [Security Policy](SECURITY.md)
+
+### Special Thanks
+**[@marcolinux46](https://github.com/marcolinux46)** - Extensive testing, feedback, and edge-case reporting
+
+---
+
+## 📊 Project Status
+
+- **Current Version**: v2.0.0 (Production Ready)
+- **Next Version**: v3.0.0 (Coming Soon - Docker/SSE)
+- **Maintenance**: Active development and support
+- **Compatibility**: Python 3.9+ | Wazuh 4.8+ | Claude Desktop
+- **Platforms**: Windows, macOS, Linux
+- **License**: MIT License
+
+## 🎯 Why Choose v2.0.0 Now?
+
+✅ **Ready Today**: Production-ready with immediate deployment  
+✅ **Simple Setup**: Traditional Python installation - no Docker required  
+✅ **Proven Stable**: Mature stdio transport with reliable Claude Desktop integration  
+✅ **Full Featured**: 26 powerful security tools for comprehensive analysis  
+✅ **Universal**: Works on any system with Python 3.9+  
+✅ **No Network Config**: Direct stdio connection - no ports or networking setup  
+
+**Perfect for**: Current production deployments, development environments, and users who need immediate access to AI-powered Wazuh analysis.
