@@ -113,14 +113,16 @@ class AlertSummaryQuery(BaseModel):
         return v
     
     @validator('custom_start', 'custom_end')
-    def validate_custom_times(cls, v, values, field):
+    def validate_custom_times(cls, v, values=None, field=None):
         """Validate custom time formats."""
         if v is not None:
             # Basic ISO format validation
             import re
             if not re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}', v):
-                # Use field name directly for compatibility
-                field_name = getattr(field, 'name', 'custom_time')
+                # Use field name with fallback for compatibility
+                field_name = 'custom_time'  # Default fallback
+                if field is not None:
+                    field_name = getattr(field, 'name', field_name)
                 raise ValueError(f"{field_name} must be in ISO format (YYYY-MM-DDTHH:MM:SS)")
         return v
     
@@ -156,7 +158,7 @@ class FileHash(BaseModel):
     hash_type: Optional[str] = Field(default=None, description="Hash type (md5, sha1, sha256)")
     
     @validator('hash_value')
-    def validate_hash(cls, v, values):
+    def validate_hash(cls, v, values=None):
         """Validate hash format."""
         # Remove any whitespace
         v = v.strip().lower()
@@ -166,12 +168,16 @@ class FileHash(BaseModel):
             raise ValueError("Hash must contain only hexadecimal characters")
         
         # Validate length and determine hash type
+        # Note: In Pydantic V2, we can't modify values dict, so we rely on __init__ method
         if len(v) == 32:
-            values['hash_type'] = "md5"
+            if values is not None:  # V1 compatibility
+                values['hash_type'] = "md5"
         elif len(v) == 40:
-            values['hash_type'] = "sha1"
+            if values is not None:  # V1 compatibility
+                values['hash_type'] = "sha1"
         elif len(v) == 64:
-            values['hash_type'] = "sha256"
+            if values is not None:  # V1 compatibility
+                values['hash_type'] = "sha256"
         else:
             raise ValueError("Hash length must be 32 (MD5), 40 (SHA1), or 64 (SHA256) characters")
         

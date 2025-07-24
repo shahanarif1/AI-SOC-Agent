@@ -95,3 +95,24 @@ test_venv/
 fix-*.py
 production-checklist.md
 
+# Analysis and temporary files  
+*_TODO.md
+*_ANALYSIS.md
+*_REPORT.md
+*_report.md
+*_PLAN.md
+*_plan.md
+GITHUB_ISSUES_*.md
+PRODUCTION_*.md
+
+# Test and development files
+test_env/
+*_mock.py
+*compatibility*.py
+*pydantic*.py
+
+# Backup and status files
+*.backup
+*_STATUS.md
+CURRENT_STATUS.md
+

@@ -271,7 +271,6 @@ def check_dependencies():
         ("aiohttp", "3.8.0", "Async HTTP client"),
         ("pydantic", "1.10.0", "Data validation"),
         ("dotenv", "0.19.0", "Environment variable loading"),
-        ("websockets", "10.0", "WebSocket support"),
         ("urllib3", "1.26.0", "HTTP client library"),
         ("certifi", "2021.0.0", "SSL certificate bundle"),
         ("psutil", "5.8.0", "System monitoring")

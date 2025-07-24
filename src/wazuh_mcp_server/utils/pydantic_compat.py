@@ -188,7 +188,11 @@ try:
                                     self.name = name
                             
                             mock_field = MockField(info.field_name)
+                            # Use empty dict for values since we can't modify in V2
                             return func(cls, v, {}, mock_field)
+                        elif len(params) == 3:  # V1 signature: cls, v, values
+                            # Pass empty dict for values since we can't modify in V2
+                            return func(cls, v, {})
                         else:  # New signature: cls, v
                             return func(cls, v)
                 else:
@@ -196,7 +200,22 @@ try:
                     @field_validator(field_name, *fields)
                     @classmethod  
                     def wrapper(cls, v: Any) -> Any:
-                        return func(cls, v)
+                        # Handle 3-parameter signature for older V2
+                        import inspect
+                        sig = inspect.signature(func)
+                        params = list(sig.parameters.keys())
+                        
+                        if len(params) == 3:  # V1 signature: cls, v, values
+                            # Pass empty dict for values since we can't modify in V2
+                            return func(cls, v, {})
+                        elif len(params) == 4:  # Old V1 signature with field: cls, v, values, field
+                            # Create mock field for compatibility
+                            class MockField:
+                                def __init__(self, name='field'):
+                                    self.name = name
+                            return func(cls, v, {}, MockField())
+                        else:  # New signature: cls, v
+                            return func(cls, v)
                 
                 return wrapper
             return decorator

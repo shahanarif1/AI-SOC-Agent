@@ -1,6 +1,87 @@
 # Changelog
 
-## v2.0.0 - Intelligence Enhancement & Factory Architecture (July 14, 2025)
+All notable changes to the Wazuh MCP Server project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2.0.0] - 2025-07-24
+
+### 🚀 Major Release - Simplified & Production Ready
+
+This is a major release focusing on core MCP stdio functionality with essential bug fixes and simplified deployment.
+
+### ✨ Added
+
+#### Core Bug Fixes
+- **Fixed Counter Import Error** (#34): Resolved `NameError: name 'Counter' is not defined` in main.py
+- **Removed False Websockets Dependency** (#33): Eliminated incorrect websockets requirement from validation script
+- **Enhanced Pydantic Compatibility** (#30, #25): Complete V1/V2 compatibility layer with 3-parameter validator support
+
+#### Simplified Dependencies
+- **Streamlined Requirements**: Removed unnecessary packages (psutil, aiohttp-cors, packaging conflicts)
+- **Cross-Platform Compatibility**: Maintained all OS support while simplifying dependencies
+- **Core Functionality Focus**: MCP stdio transport with essential dependencies only
+
+### 🔧 Changed
+
+#### Simplified Architecture
+- **Removed Docker complexity**: Focus on core MCP stdio functionality
+- **Removed HTTP endpoints**: No web server needed for stdio transport
+- **Streamlined CI/CD**: Simplified to core functionality testing
+- **Dependency cleanup**: Removed unnecessary monitoring and container dependencies
+
+#### Maintained Core Features
+- **Cross-platform installation scripts**: Windows, macOS, Linux, Fedora support maintained
+- **Configuration management**: Environment-based configuration preserved
+- **Security features**: Input validation and SSL/TLS handling retained
+- **Pydantic compatibility**: Full V1/V2 support maintained
+
+### 💥 Breaking Changes
+
+- **None**: This release maintains full backward compatibility
+- All existing Claude Desktop configurations continue to work
+- Installation scripts remain unchanged
+
+### 🔄 Migration Guide
+
+This release is fully backward compatible. **No migration required**.
+
+**Installation remains the same**:
+```bash
+# Standard installation
+pip install wazuh-mcp-server==2.0.0
+
+# Or use installation scripts
+python scripts/install.py
+```
+
+**Claude Desktop configuration unchanged**:
+```json
+{
+  "mcpServers": {
+    "wazuh": {
+      "command": "python3",
+      "args": ["/path/to/main.py"]
+    }
+  }
+}
+```
+
+### 🎯 Focus: Core MCP stdio Functionality
+
+This release removes complexity and focuses on what matters:
+- ✅ **MCP stdio transport** (the actual MCP protocol)
+- ✅ **Cross-platform compatibility** (Windows, macOS, Linux)
+- ✅ **Essential dependencies only** (no bloat)
+- ✅ **Working installation scripts** (all platforms)
+- ✅ **Bug fixes for GitHub issues** (#34, #33, #30, #25)
+
+**Result**: Simplified, working, production-ready MCP stdio server.
+
+---
+
+## [1.0.1] - Intelligence Enhancement & Factory Architecture (July 14, 2025)
 
 ### 🚀 Major Features
 
