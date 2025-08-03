@@ -3532,7 +3532,7 @@ class WazuhMCPServer:
         }
         
         return analytics
-    
+    from collections import Counter
     def _calculate_exploitation_risk_score(self, severity_counts: Counter, exploit_counts: Counter) -> float:
         """Calculate overall exploitation risk score (0-100)."""
         if not severity_counts:
