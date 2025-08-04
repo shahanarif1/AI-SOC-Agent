@@ -128,8 +128,8 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 python-multipart==0.0.20
 pytz==2025.2
-pywin32==311
-pywin32-ctypes==0.2.3
+#pywin32==311
+#pywin32-ctypes==0.2.3
 PyYAML==6.0.2
 readme_renderer==44.0
 referencing==0.36.2
@@ -187,3 +187,4 @@ wheel==0.45.1
 yarl==1.20.1
 zstandard==0.23.0
 streamlit
+

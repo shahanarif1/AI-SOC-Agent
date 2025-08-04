@@ -416,7 +416,7 @@ class WazuhMCPServer:
             try:
                 with LogContext(request_id):
                     self.logger.info(f"Reading resource: {uri}")
-                    
+                    uri = str(uri)
                     if uri == "wazuh://alerts/recent":
                         data = await self.api_client.get_alerts(limit=50)
                         return json.dumps(self._format_alerts(data), indent=2)
@@ -3533,7 +3533,7 @@ class WazuhMCPServer:
         
         return analytics
     from collections import Counter
-    def _calculate_exploitation_risk_score(self, severity_counts: Counter, exploit_counts: Counter) -> float:
+    def _calculate_exploitation_risk_score(self, severity_counts, exploit_counts) -> float:
         """Calculate overall exploitation risk score (0-100)."""
         if not severity_counts:
             return 0.0
