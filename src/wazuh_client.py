@@ -20,6 +20,7 @@ SUBSCRIPTION_KEY = os.getenv("OPENAI_API_KEY")
 END_POINT = os.getenv("END_POINT")
 ENV_PATH = Path(__file__).resolve().parents[1] / '.env'
 SERVER_PATH = Path(__file__).resolve().parents[1] /'src'/'wazuh_mcp_server'/'main.py'
+PYTHON_PATH = Path(__file__).resolve().parents[1] / 'venv' / 'Scripts' / 'python.exe'
 project_root = Path(__file__).resolve().parent.parent.parent
 
 # print(f'These are the paths {ENV_PATH} and Server path:{SERVER_PATH}')
@@ -44,10 +45,13 @@ class MCPClient:
         # self.llm = ChatOllama(model=model_name, temperature=0.6, streaming=False)
         self.resource_map = {}
 
+
+    # --- Server Connection  ---
+
     async def connect(self, server_path: str):
         server_params = StdioServerParameters(
-            command="python",
-            args=[str(server_path)],
+            command= str(PYTHON_PATH),
+            args= [str(server_path)],
             env=None
         )
         stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
@@ -63,85 +67,147 @@ class MCPClient:
                 "data": content.contents[0] if content.contents else {}
             }
 
-    async def process_query(self, query: str) -> str:
-
-         # Step 1: Ask LLM if a resource is needed
-        resource_list = "\n".join([f"- {desc}" for desc in self.resource_map.keys()])
-
-        assistant_prompt = f"""
-        # You are an helpful assistant."
-        # Choose one resource realted to asked about in the query. 
-        # Here are available data sources:
-        # {resource_list}
-        # reply with ONLY one exact matching resource description. if you think more than one corrosponds still select one and return only one resource. 
-        # reply ONLY with the exact matching resource description.
-        # If not, reply with: NONE
-        # """
-
-        user_prompt = f'''
+    
+    # --- Building Query Understanding  ---
+    
+    async def built_understanding(self, query:str , resource_list) ->str:
         
+        assistant_prompt = f"""
+            #You are a cybersecurity Analyst for a SOC team.
+            #Your role is to interpret queries written in natural language by User and i want you to build an understanding of what inforamtion does user want in his query.
+            #Your job is to point out resource(s) that you think would best describe or can fulfill users need and best match the user's query.
+            # I want you to Think step by step and build an understanding as an SOC analyst of available resources and what inforamtion would be available in them.
+            #Here is the list of available resources:
+            {resource_list}
+            #Here is the query: {query}
+            #Instructions:
+            #You can expand on users Query to answer it more in detail but you should not expand on the query in any way that is not necessary to answer the query.
+            #point out one or more resources with solid reason why you narrowed this resource / resources that best match user's query.
+            #Mention resources one by one and reason to use them as resource to answer the user's query.
+            #Create a final understanding and mention resource names and reason to use them.
+            # """
+        try:
+            completion = self.chat_client.chat.completions.create(messages = [{'role': 'system' , 'content':assistant_prompt}],
+                                                                               max_completion_tokens = 1000,
+                                                                               temperature = 1.0,
+                                                                               top_p=1.0,
+                                                                               frequency_penalty=0.0,
+                                                                               presence_penalty=0.0,
+                                                                               model = self.model_name )
+        
+        
+            print(completion.choices[0].message.content.strip().splitlines())
+            return completion.choices[0].message.content.strip().splitlines()
+        except Exception as e :
+            print(f'Error an Occured !! {e}')
+            return ''
+
+    # --- Selecting Resources ---
+        
+    async def select_resource(self , query: str) -> str:
+        resource_list = "\n".join([f"- {desc}" for desc in self.resource_map.keys()])
+        understanding  = await self.built_understanding(query , resource_list)
+        if understanding == '':
+            return "" 
+        assistant_prompt = f"""
+            #You are a cybersecurity SOC assistant for a SOC team.
+            #Your role is to take into account what SOC analyst has understood from query and built a list of resources that best match the user's intent.
+            #Your job is to choose the resource(s) according to that understanding.
+            #Here is the understanding from SOC analyst:
+            {understanding}
+            #Here is the list of available resources
+            {resource_list}
+            #Instructions:
+            - Choose one or more resources best match the SOC Analyst's final understanding.
+            - Finalise the relevant resource(s) based on the understanding.
+            - If only one resource matches, return just that resource name.
+            - If more than one resource matches, return a list (one per line).
+            - If **none** of the resources match the query, reply with: NONE
+            - Do NOT explain anything. Just output the exact matching resource name(s).
+            """
+        user_prompt = f'''
+            #{query}
+
+            '''
+        try:
+            completion = self.chat_client.chat.completions.create(messages = [{'role': 'system' , 'content':assistant_prompt}
+                                                                               ,{'role':'user' , 'content':user_prompt}],
+                                                                               max_completion_tokens = 800,
+                                                                               temperature = 0.7,
+                                                                               top_p=1.0,
+                                                                               frequency_penalty=0.0,
+                                                                               presence_penalty=0.0,
+                                                                               model = self.model_name )
+        
+        
+        
+            return completion.choices[0].message.content.strip().splitlines()
+        except Exception as e :
+            print(f'Error an Occured !! {e}')
+            return ''
+
+
+    # --- Multicontext Querying  ---
+    
+    async def process_query_Multi_resource(self, query: str, selected_resources: list) -> str:
+
+        import re 
+        import json
+        pattern = r'[^A-Za-z ]+'
+        parsed_resources = [re.sub(pattern, '', s).strip().lower() for s in selected_resources]
+
+        matched_data = {}
+
+        for resource in parsed_resources:
+            match = next((key for key in self.resource_map if resource in key.lower()), None)
+            if not match:
+                continue
+
+            resource_entry = self.resource_map.get(match)
+            raw_data = resource_entry.get("data") if isinstance(resource_entry, dict) else None
+
+            if not raw_data:
+                return f"⚠️ No data found for resource: {match}"
+            try:
+                if hasattr(raw_data, "text"):
+                    json_text = raw_data.text
+                elif isinstance(raw_data, str):
+                    json_text = raw_data
+                else:
+                    return f"⚠️ Unsupported data format for resource: {match}"
+
+            # Parse JSON data
+                parsed_json = json.loads(json_text)
+                matched_data[match] = parsed_json
+
+            except json.JSONDecodeError:
+                return f"⚠️ Couldn't parse JSON data for resource: {match}"
+            except Exception as e:
+                return f"⚠️ Unexpected error while processing resource {match}: {e}"
+
+        if not matched_data:
+            return "⚠️ No matching resources with valid data were found."
+
+        print(f"[INFO] Matched and parsed resources: {list(matched_data.keys())}")
+
+        context = "\n\n".join([f"{k}:\n{json.dumps(v, indent=2)}" for k, v in matched_data.items()])
+
+        system_prompt = f"""
+                    #You are a SOC analyst. Read the data and Format the data as clean report or summary for the user based on their query.
+                    #so the user is able to understnad the response by just reading it. 
+                    #Here is the Data:
+                    #{context}
+
+                    #Reply clearly, needed detail not more, and professionally.
+                    #Replace wazuh with Threat-Hawk whereever you may find it.
+                    """
+        user_prompt = f'''
         #{query}
 
          '''
-        
-        completion = self.chat_client.chat.completions.create(messages = [{'role': 'assistant' , 'content':assistant_prompt}
-                                                                               ,{'role':'user' , 'content':user_prompt}],
-                                                                               max_completion_tokens = 1000,
-                                                                               temperature = 1.0,
-                                                                               top_p=1.0,
-                                                                               frequency_penalty=0.0,
-                                                                               presence_penalty=0.0,
-                                                                               model = self.model_name )
-        # selected = detect_response.content.strip().lower()
-        print(f'this is the response from the chatgpt :  { completion.choices[0].message.content}')
-        lines = completion.choices[0].message.content.strip().splitlines()
-        for line in reversed(lines):
-            if line.strip():
-                selected = line.strip().lower()
-                import re
-                selected = re.sub(r'[^A-Za-z ]+', '', selected)
-        print(f'selected:{selected}')
-        
-        if selected == "none":
-            # response = self.chat_client.response()
-            return 'You have Not Selected Resource that is Available !!'
-        
-        selected = selected.lower().strip()
-        # print(f'selected key:{selected}')
-        # print(f'{self.resource_map.keys()}') 
-        matched_key = next((k for k in self.resource_map.keys() if selected in k.lower()), None)
-        # print(f'matched_key:{matched_key}selected:{selected}')
-        if not matched_key:
-            return "I'm sorry, I couldn't find relevant data for your request."
 
         try:
-            key = matched_key
-            print(f'Here:  type of matched key is : {type(matched_key)} and Matched key is: {key} ')
-            if key not in self.resource_map:
-                return "⚠️ I couldn't find the Wazuh alerts data."
-            json_data = self.resource_map[key]["data"]
-            # print(f'SO this is json data : {json_data}')
-            if not hasattr(json_data, "text"):
-                return "⚠️ The resource data isn't in readable format."
-            
-            try:
-
-                parsed_json = json.loads(json_data.text)
-                # print(f'This is the parsed JSON : {parsed_json}')
-            except json.JSONDecodeError:
-                return "⚠️ Couldn't parse the Wazuh alert data."
-
-            system_prompt = f"""
-                #You are a SOC analyst. Read the data and Format the data as clean report or summary for the user based on their query.
-                #so the user is able to understnad the response just reading it. 
-                #Here is the Data:
-                #{json.dumps(parsed_json, indent=2)}
-
-                #Reply clearly, concisely, and professionally.
-                #Replace : Replace Whereever Wazuh is with Threat-Hawk 
-                """
-            try:
-                result = self.chat_client.chat.completions.create(messages = [{'role': 'system' , 'content':system_prompt}
+            result = self.chat_client.chat.completions.create(messages = [{'role': 'assistant' , 'content':system_prompt}
                                                                                ,{'role':'user' , 'content':user_prompt}],
                                                                                max_completion_tokens = 1000,
                                                                                temperature = 1.0,
@@ -149,15 +215,88 @@ class MCPClient:
                                                                                frequency_penalty=0.0,
                                                                                presence_penalty=0.0,
                                                                                model = self.model_name )
-            except Exception as e :
-                print(f'Error an Occured !! {e}')
-                return '⚠️ Couldn''t perform query !!! Something went wrong while processing your request !!!'
+        except Exception as e :
+            print(f'Error an Occured !! {e}')
+            return '⚠️ Couldn''t perform query !!! Something went wrong while processing your request !!!'
             
-            print(f'This is response from Chat GPT : {result.choices[0].message.content}')
-            return result.choices[0].message.content
+                # print(f'This is response from Chat GPT : {result.choices[0].message.content}')
+        return result.choices[0].message.content
 
-        except Exception:
-            return "⚠️ Something went wrong while processing your request."
+    # --- Processing Query ---
+
+    async def process_query(self, query: str) -> str:
+
+        selected = []
+        lines = await self.select_resource(query)
+        if lines == '':
+            return "⚠️ I couldn't find the Threat-Hawk alerts data."
+        print(f'lines : {lines}')
+        # print(f' Returned Result : {lines[0]} ')                  # Debug Output:
+        selected = lines
+        print(f'selected : {selected} and length: {len(selected)}')
+        if len(selected) == 1:                                      # if user wants to handle only and read from one resource...
+            Resource = next(iter(selected), None)              
+            Resource = Resource.strip().lower()
+            import re
+            pattern = r'[^A-Za-z ]+'
+            Resource = re.sub(pattern, '', Resource).strip().lower()
+            print(f'[INFO] Matched and parsed resources: {Resource}')
+            if Resource == "none":
+                return 'You have Not Selected Resource that is Available !!'
+            
+            matched_key = next((k for k in self.resource_map.keys() if Resource in k.lower()), None)
+            # print(f'matched_key is : {matched_key}')              #Debug Output
+            if not matched_key:
+                return "I'm sorry, I couldn't find relevant data for your request."
+
+            try:
+                key = matched_key
+                # print(f'These are the keys : {key} : and the type of key is : {type(key)}')
+                if key not in self.resource_map:
+                    return "⚠️ I couldn't find the Threat-Hawk alerts data."
+                json_data = self.resource_map[key]["data"]
+                
+                if not hasattr(json_data, "text"):
+                    return "⚠️ The resource data isn't in readable format."
+            
+                try:
+                    parsed_json = json.loads(json_data.text)
+                except json.JSONDecodeError:
+                    return "⚠️ Couldn't parse the Threat-Hawk alert data."
+
+                system_prompt = f"""
+                    #You are a SOC analyst. Read the data and Format the data as clean report or summary for the user based on their query.
+                    #so the user is able to understnad the response just reading it.
+                    #Here is the Data:
+                    #{json.dumps(parsed_json, indent=2)}
+
+                    #Reply clearly, concisely, and professionally.
+                    #Replace wazuh with Threat-Hawk whereever you may find it.
+                    """
+                user_prompt = f'''
+                    #{query}
+
+                    '''
+                try:
+                    result = self.chat_client.chat.completions.create(messages = [{'role': 'assistant' , 'content':system_prompt}
+                                                                               ,{'role':'user' , 'content':user_prompt}],
+                                                                               max_completion_tokens = 1000,
+                                                                               temperature = 1.0,
+                                                                               top_p=1.0,
+                                                                               frequency_penalty=0.0,
+                                                                               presence_penalty=0.0,
+                                                                               model = self.model_name )
+                except Exception as e :
+                    print(f'Error an Occured !! {e}')
+                    return '⚠️ Couldn''t perform query !!! Something went wrong while processing your request !!!'
+            
+                return result.choices[0].message.content
+
+            except Exception:
+                return "⚠️ Something went wrong while processing your request."
+        else:
+            response = await self.process_query_Multi_resource(query , selected) 
+            return response
 
     async def close(self):
         await self.exit_stack.aclose()
@@ -251,9 +390,6 @@ if user_input:
                 import signal
                 os.kill(os.getpid(), signal.SIGKILL)
 
-
-            # st.markdown(result)
-            # st.session_state.chat_history.append(("Bot", result))
 
 # --- Display Chat History ---
 for role, msg in st.session_state.chat_history:
