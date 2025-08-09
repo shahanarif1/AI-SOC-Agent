@@ -20,7 +20,7 @@ SUBSCRIPTION_KEY = os.getenv("OPENAI_API_KEY")
 END_POINT = os.getenv("END_POINT")
 ENV_PATH = Path(__file__).resolve().parents[1] / '.env'
 SERVER_PATH = Path(__file__).resolve().parents[1] /'src'/'wazuh_mcp_server'/'main.py'
-PYTHON_PATH = Path(__file__).resolve().parents[1] / 'venv' / 'Scripts' / 'python.exe'
+PYTHON_PATH = Path(__file__).resolve().parents[1] / 'venv' / 'bin' / 'python.exe'
 project_root = Path(__file__).resolve().parent.parent.parent
 
 # print(f'These are the paths {ENV_PATH} and Server path:{SERVER_PATH}')
