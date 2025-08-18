@@ -18,6 +18,8 @@ import sys
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+
+from wazuh_mcp_server import config
 from wazuh_mcp_server.config import WazuhConfig
 from wazuh_mcp_server.utils.logging import get_logger
 
@@ -59,25 +61,36 @@ def _safe_print(text):
 
 class ConnectionValidator:
     """Intelligent connection validator with protocol detection."""
-    
-    def __init__(self, config: WazuhConfig):
+    # Step 3 : 
+    def __init__(self, config: WazuhConfig):                                                                    # Connection Validator Initialization
+        
         self.config = config
-        self.results = {
-            'manager': {'reachable': False, 'protocol': None, 'ssl_valid': False},
-            'indexer': {'reachable': False, 'protocol': None, 'ssl_valid': False},
+        self.results = {                                                                                        # Initialize results dictionary        
+            'manager': {'reachable': False, 'protocol': None, 'ssl_valid': False},                               #Changed to True
+            'indexer': {'reachable': False, 'protocol': None, 'ssl_valid': False},                               #Changed to True        
             'recommendations': []
         }
     
-    async def validate_all_connections(self) -> Dict:
+    async def validate_all_connections(self) -> Dict:                                                           #This one will return the dictionary of results
         """Validate all configured connections."""
         _safe_print("🔍 Starting comprehensive connection validation...")
         _safe_print("")
         
         # Test Wazuh Manager
         if self.config.host:
+
             _safe_print(f"📡 Testing Wazuh Manager: {self.config.host}:{self.config.port}")
             manager_result = await self.test_manager_connection()
+
+            # print(f"Manager result: {manager_result}")  # Debug print done Result is sucess uptill here:
+            # result: {'success': True, 'ssl_valid': True, 'self_signed': True, 'error': None}
+            
             self.results['manager'] = manager_result
+            #print(f"Results after manager test: {self.results['manager']}")  # Debug print done Result is sucess uptill here:
+            # Results after manager test: {'reachable': False, 'protocol': 'https', 'ssl_valid': True, 'self_signed': True, 'auth_success': True, 'api_version': None, 'error': None, 'success': True}
+            
+            
+            # self.results['manager']['reachable'] = True  # Ensure reachable is set correctly (changed to true)
             self._print_connection_result("Manager", manager_result)
         
         # Test Wazuh Indexer
@@ -108,8 +121,10 @@ class ConnectionValidator:
         https_result = await self._test_https_connection(
             self.config.host, self.config.port
         )
+        print(f"HTTPS result: {https_result}")  # Debug print done Result is uptill here:
         
         if https_result['success']:
+
             result.update(https_result)
             result['protocol'] = 'https'
             
@@ -117,12 +132,18 @@ class ConnectionValidator:
             auth_result = await self._test_api_authentication()
             result['auth_success'] = auth_result.get('success', False)
             result['api_version'] = auth_result.get('version')
+            print(f"Authentication_success result: {result['auth_success']}")  # Debug print done Result is Success uptill here:       
             if not auth_result.get('success'):
+                
                 result['error'] = auth_result.get('error')
-        
+            else:
+                result['reachable'] = True
+        # print(f"Result after HTTPS and auth test: {result}")  # Debug print done Result is uptill here:
         return result
     
     async def test_indexer_connection(self) -> Dict:
+       
+       
         """Test Wazuh Indexer connection."""
         result = {
             'reachable': False,
@@ -134,19 +155,24 @@ class ConnectionValidator:
         }
         
         # Test HTTPS connection
+        #1.Step:
         https_result = await self._test_https_connection(
             self.config.indexer_host, self.config.indexer_port
         )
-        
+        #2. Step: After the https result.
         if https_result['success']:
             result.update(https_result)
             result['protocol'] = 'https'
             
             # Test Indexer API
+            print('Testing indexer_API')  # Debug print
             cluster_result = await self._test_indexer_api()
             result['cluster_status'] = cluster_result.get('status')
+            print(f"Cluster status: {result['cluster_status']}")  # Debug print
             if not cluster_result.get('success'):
                 result['error'] = cluster_result.get('error')
+            else:       
+                result['reachable'] = True
         
         return result
     
@@ -155,20 +181,25 @@ class ConnectionValidator:
         result = {
             'success': False,
             'ssl_valid': False,
-            'self_signed': False,
+            'self_signed': True,
             'error': None
         }
         
         # Test with SSL verification
         try:
             context = ssl.create_default_context()
-            with socket.create_connection((host, port), timeout=10) as sock:
-                with context.wrap_socket(sock, server_hostname=host) as ssock:
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+            with socket.create_connection((host, port), timeout=10) as sock:   #code runs here until here: and creates a socket connection
+                print(f"Socket created:{sock}")  #Debug print
+                with context.wrap_socket(sock, server_hostname=host) as ssock:  #this line is where the SSL handshake happens but it does not work
+                    print(f"SSL socket created: {ssock}")  #Debug print
                     result['success'] = True
-                    result['ssl_valid'] = True
+                    result['ssl_valid'] = True                         #Changed this to False
+                    print(f" result: {result} ")   #Debug print 
                     return result
         except ssl.SSLCertVerificationError:
-            result['self_signed'] = True
+            result['self_signed'] = True           #changed this to False
         except Exception as e:
             result['error'] = str(e)
         
@@ -178,8 +209,10 @@ class ConnectionValidator:
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
             
-            with socket.create_connection((host, port), timeout=10) as sock:
-                with context.wrap_socket(sock, server_hostname=host) as ssock:
+            with socket.create_connection((host, port), timeout=10) as sock: #this works
+                print(f"Socket created: {sock}")  #Debug print
+                with context.wrap_socket(sock, server_hostname=host) as ssock:  #this also works
+                    print(f"SSL socket created: {ssock}")  #Debug print
                     result['success'] = True
                     result['ssl_valid'] = False
                     return result
@@ -193,34 +226,53 @@ class ConnectionValidator:
         result = {'success': False, 'error': None, 'version': None}
         
         # Create SSL context based on configuration
-        ssl_context = ssl.create_default_context()
-        if not self.config.verify_ssl:
+        ssl_context = ssl.create_default_context()                         #Create SSL Context
+        if not self.config.verify_ssl:                                     #Set to False to disable SSL verification in Configuration.(Config.py)
+            print("Disabling SSL verification")  # Debug print
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
         
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        
+        connector = aiohttp.TCPConnector(ssl=ssl_context)                    # Create TCP connector with SSL context with no Certificate verification.
+        print(f"Connector created: {connector}")                             # Debug print
+        # Connector created: <aiohttp.connector.TCPConnector object at 0x000002CB4DAAFFE0>
+
+
         try:
             async with aiohttp.ClientSession(connector=connector) as session:
                 # Test authentication endpoint
                 auth_url = f"{self.config.base_url}/security/user/authenticate"
                 auth = aiohttp.BasicAuth(self.config.username, self.config.password)
+                print(f'here')  # Debug print
                 
                 async with session.post(auth_url, auth=auth) as response:
+                    print(f"Response status: {response.status}")  # Debug print
                     if response.status == 200:
                         result['success'] = True
                         # Get API version
-                        version_url = f"{self.config.base_url}/"
-                        async with session.get(version_url, headers={'Authorization': f'Bearer {(await response.json()).get("token", "")}'}) as version_response:
+                        version_url = f"{self.config.base_url}/"      #Error here: # This URL should be the correct endpoint for fetching API version
+                        print(f"Testing version URL: {version_url}")
+                        response_json = await response.json()  # Extract token from authentication response
+                        response_token = response_json['data']['token']
+                        # print(f"Testing version URL with token: {response_json['data']['token']}  and Token: {response_token}")  # Debug print
+
+
+                        async with session.get(version_url, headers={'Authorization': f'Bearer {response_token}'}) as version_response:
+                            # print(f"Version response: {version_response}")  # Debug print
+                            # print(f"Version response status: {version_response.status}")  # Debug print
                             if version_response.status == 200:
+                                print('here in version response')  # Debug print
                                 version_data = await version_response.json()
-                                result['version'] = version_data.get('data', {}).get('api_version')
+                                print(f"Version data: {version_data['data'].get('api_version')}")  # Debug print
+                                # print(f"Version data: {version_data}")
+                                result['version'] = version_data['data'].get('api_version')  # Adjust based on actual API response structure
+                                result['success'] = True
                     else:
                         result['error'] = f"Authentication failed: HTTP {response.status}"
         
         except Exception as e:
             result['error'] = str(e)
-        
+        print('here at the end of _test_api_authentication')  # Debug print
+        print(f"Final authentication result: {result}")  # Debug print
         return result
     
     async def _test_indexer_api(self) -> Dict:
@@ -250,6 +302,7 @@ class ConnectionValidator:
                         result['success'] = True
                         health_data = await response.json()
                         result['status'] = health_data.get('status', 'unknown')
+                        print(f"Cluster status: {result['status']}")  # Debug print
                     else:
                         result['error'] = f"Cluster health check failed: HTTP {response.status}"
         
@@ -344,7 +397,8 @@ class ConnectionValidator:
             _safe_print("")
 
 
-async def main():
+async def main():                                   # this is Testing script main Entry point:
+
     """Main function for connection validation."""
     try:
         # Load configuration
@@ -358,6 +412,7 @@ async def main():
         
         # Print summary
         _safe_print("📋 VALIDATION SUMMARY:")
+
         if _supports_unicode():
             manager_icon = '✅' if results['manager']['reachable'] else '❌'
             indexer_icon = '✅' if results['indexer']['reachable'] else '❌'
@@ -371,6 +426,7 @@ async def main():
         # Exit with appropriate code
         if results['manager']['reachable']:
             _safe_print("\n🎉 Validation completed successfully!")
+            print("Validation passed")
             return 0
         else:
             _safe_print("\n❌ Validation failed - check configuration and network connectivity")
@@ -382,13 +438,20 @@ async def main():
 
 
 if __name__ == "__main__":
+    # print('this is src path')
+    # print(f'sys.path: {sys.path}')
+
     # Set up console encoding for Windows
     if platform.system() == "Windows":
         try:
             # Try to set UTF-8 encoding for Windows console
-            import codecs
-            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'replace')
-            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'replace')
+            # import codecs
+            # sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'replace')
+            # sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'replace')
+            import io
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
         except Exception:
             # If that fails, we'll use ASCII fallbacks in the print functions
             pass

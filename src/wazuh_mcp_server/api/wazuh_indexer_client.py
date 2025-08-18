@@ -189,8 +189,9 @@ class WazuhIndexerClient:
             request_id = f"indexer_req_{int(time.time() * 1000)}"
             
             with LogContext(request_id):
-                logger.debug(f"Making {method} request to {endpoint}", extra={
-                    "details": {"endpoint": endpoint, "has_data": data is not None}
+                logger.error(f"Making {method} request to {endpoint}", extra={
+                    "details": {"endpoint": endpoint, "has_data": data is not None} ,
+                    "Query" : data
                 })
                 
                 kwargs = {
@@ -209,7 +210,7 @@ class WazuhIndexerClient:
                     response_time = time.time() - start_time
                     
                     # Log performance metrics
-                    logger.debug(f"Indexer request completed", extra={
+                    logger.error(f"Indexer request completed", extra={
                         "details": {
                             "status": response.status,
                             "response_time_ms": round(response_time * 1000, 2),
@@ -429,7 +430,7 @@ class WazuhIndexerClient:
             "size": min(limit, 1000),
             "sort": [
                 {
-                    "@timestamp": {
+                    "vulnerability.detected_at": {
                         "order": "desc"
                     }
                 }
@@ -442,12 +443,14 @@ class WazuhIndexerClient:
         }
         
         # Add filters
+        clean_agent_id = None
         if agent_id:
             clean_agent_id = sanitize_string(agent_id, 20)
             query["query"]["bool"]["must"].append({
                 "term": {"agent.id": clean_agent_id}
             })
         
+        clean_cve_id = None
         if cve_id:
             clean_cve_id = sanitize_string(cve_id, 50)
             query["query"]["bool"]["must"].append({
@@ -458,12 +461,24 @@ class WazuhIndexerClient:
         if not query["query"]["bool"]["must"]:
             query["query"] = {"match_all": {}}
         
-        logger.info(f"Searching vulnerabilities in Indexer", extra={
+        logger.error(f"Searching vulnerabilities in Indexer", extra={
             "details": {"agent_id": agent_id, "cve_id": cve_id, "limit": limit}
-        })
+        }  )
         
-        # Use field mapper to get proper index pattern
-        vuln_index = self.field_mapper.get_index_pattern("vulnerabilities")
+        vuln_index = "threathawk-vulnerabilities"
+        logger.info("Indexer vulnerability search request", extra={
+            "details": {
+                "endpoint": f"/{vuln_index}/_search",
+                "index_pattern": vuln_index,
+                "payload": query,
+                "params": {
+                    "agent_id_raw": agent_id,
+                    "agent_id_sanitized": clean_agent_id,
+                    "cve_id_raw": cve_id,
+                    "cve_id_sanitized": clean_cve_id
+                }
+            }
+        })
         result = await self._request("POST", f"/{vuln_index}/_search", data=query)
         
         # Transform to match Server API format

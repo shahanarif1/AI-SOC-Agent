@@ -523,8 +523,26 @@ def test_connection():
         print("Running comprehensive connection validation...")
         start_time = time.time()
         
-        result = subprocess.run([str(python_exe), str(validator_script)],
+        try:
+            if not basic_success:
+                print_check("Connection test", False, "Basic connectivity failed, skipping full validation")
+                return False
+            else:
+                print("   Running connection validator script...")
+                # Run the validator script
+                # python_absolute = f"E:\\Cyber_Silo\\Wazuh-MCP-Server\\venv\\Scripts\\python.exe"
+                # validator_path = f"E:\\Cyber_Silo\\Wazuh-MCP-Server\\src\\wazuh_mcp_server\\scripts\\connection_validator.py"        
+                
+                result = subprocess.run([ str(python_exe)  , str(validator_script) ],
                               capture_output=True, text=True, timeout=60)
+                print("   Connection validator script completed.")
+                # print(f"   Validator output: {result.stdout}")
+                if result.returncode != 0:
+                    print(f"   Error during validation: {result.stderr}")
+        except Exception as e:
+            print(f"   Error during validation: {e}")
+
+        
         
         end_time = time.time()
         response_time = end_time - start_time
@@ -585,6 +603,7 @@ def _test_basic_connectivity():
             return False
         
         host = config.get('WAZUH_HOST', 'localhost')
+        print(f'   Testing basic connectivity to {host}...')        
         port = int(config.get('WAZUH_PORT', '55000'))
         
         if host in ['localhost', '127.0.0.1'] or host.startswith('your-'):
@@ -670,6 +689,7 @@ if __name__ == "__main__":
         except:
             pass
 
+#Check production readiness:
 
 def check_production_readiness():
     """Check production deployment readiness."""
@@ -690,7 +710,8 @@ def check_production_readiness():
             readiness_checks.append(("Production hosts configured", False, "localhost/127.0.0.1 found in config"))
         else:
             readiness_checks.append(("Production hosts configured", True, "Using production hosts"))
-    
+
+
     # Check log directory structure
     logs_dir = Path("logs")
     if logs_dir.exists():

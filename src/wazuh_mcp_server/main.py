@@ -11,6 +11,8 @@ import sys
 import json
 import asyncio
 import uuid
+from collections import Counter
+
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 from pathlib import Path
@@ -67,7 +69,7 @@ class WazuhMCPServer:
             enable_rotation=True
         )
         
-        self.logger.info(f"Initializing Wazuh MCP Server v{__version__}")
+        self.logger.info(f"Initializing Wazuh MCP Server version : {__version__}")
         
         # Check optional dependencies and warn about missing features
         self._check_optional_dependencies()
@@ -214,6 +216,7 @@ class WazuhMCPServer:
             """List available Wazuh resources."""
             return [
                 types.Resource(
+                    # https://your-wazuh-manager:55000/alerts/recent
                     uri="wazuh://alerts/recent",
                     name="Recent Alerts",
                     description="Most recent security alerts from Wazuh",
@@ -415,18 +418,20 @@ class WazuhMCPServer:
             
             try:
                 with LogContext(request_id):
+                    uri = str(uri)
                     self.logger.info(f"Reading resource: {uri}")
+                    self.logger.error(f"DEBUG: Received URI: {repr(uri)}")
                     
-                    if uri == "wazuh://alerts/recent":
+                    if uri == "wazuh://alerts/recent":                            #Changed URI
                         data = await self.api_client.get_alerts(limit=50)
                         return json.dumps(self._format_alerts(data), indent=2)
-                    
-                    elif uri == "wazuh://alerts/summary":
+
+                    elif uri == "wazuh://alerts/summary":                          #Changed URI
                         data = await self.api_client.get_alerts(limit=1000)
                         summary = self._generate_alert_summary(data)
-                        return json.dumps(summary, indent=2)
+                        return json.dumps(summary ,indent=2)                 #added uri as an output
                     
-                    elif uri == "wazuh://agents/status":
+                    elif uri == "wazuh://agents/status":                            #Changed URI
                         data = await self.api_client.get_agents()
                         return json.dumps(self._format_agents(data), indent=2)
                     
@@ -4444,7 +4449,7 @@ class WazuhMCPServer:
     async def _get_critical_vulnerabilities(self, agents_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get critical vulnerabilities across agents."""
         agents = agents_data.get("data", {}).get("affected_items", [])
-        active_agents = [a for a in agents if a.get("status") == "active"][:10]  # Limit to 10 agents
+        active_agents = [a for a in agents if a.get("status") == "active"][:20]  # Limit to 10 agents Total Agents 10 limit
         
         critical_vulns = []
         
@@ -4465,6 +4470,10 @@ class WazuhMCPServer:
                             "severity": severity,
                             "cve": vuln.get("cve", "N/A")
                         })
+                from wazuh_mcp_server.utils import get_logger
+                logger = get_logger(__name__)
+                logger.error(f'Agent info has been fetched for agent {agent["id"]} and total vulnerabilities are: {len(agent_critical_vulns)}')
+                
                 return agent_critical_vulns
             except Exception as e:
                 self.logger.warning(f"Could not get vulnerabilities for agent {agent['id']}: {str(e)}")
@@ -4481,7 +4490,8 @@ class WazuhMCPServer:
         
         return {
             "total_critical_vulnerabilities": len(critical_vulns),
-            "vulnerabilities": critical_vulns[:50],  # Limit response size
+            "vulnerabilities": critical_vulns[:50],  # Limit response size      50 is the limit set by the API
+ 
             "agents_checked": len(active_agents)
         }
     

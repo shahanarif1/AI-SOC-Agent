@@ -176,6 +176,7 @@ class GlobalRateLimiter:
     
     def configure_endpoint(self, endpoint: str, config: RateLimitConfig):
         """Configure rate limiting for a specific endpoint."""
+        print(f'this is the end point called :  {endpoint}')
         self.limiters[endpoint] = SlidingWindowRateLimiter(config)
     
     def configure_token_bucket(self, identifier: str, max_tokens: int, refill_rate: float):
