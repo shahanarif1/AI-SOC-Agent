@@ -477,7 +477,7 @@ def test_installation(python_exe: str) -> bool:
 
 def generate_claude_config(system_info: Dict[str, str]) -> str:
     """Generate Claude Desktop configuration."""
-    project_path = Path.cwd().absolute()
+    project_path = Path.cwd().absolute()             
     main_py_path = project_path / "src" / "wazuh_mcp_server" / "main.py"
     
     # Use appropriate path format for OS
@@ -504,7 +504,7 @@ def generate_claude_config(system_info: Dict[str, str]) -> str:
 def show_completion_message(system_info: Dict[str, str]):
     """Show comprehensive completion message with next steps."""
     activate_cmd, python_exe, _ = get_activation_info(system_info)
-    claude_config = generate_claude_config(system_info)
+    # claude_config = generate_claude_config(system_info)
     
     print()
     print(f"{Colors.GREEN}{'=' * 70}")
@@ -531,19 +531,19 @@ def show_completion_message(system_info: Dict[str, str]):
     print(f"{Colors.CYAN}3. Claude Desktop Integration:{Colors.END}")
     
     # OS-specific Claude Desktop paths
-    if system_info['os'] == 'Darwin':
-        config_path = "~/Library/Application Support/Claude/claude_desktop_config.json"
-    elif system_info['os'] == 'Windows':
-        config_path = "%APPDATA%\\Claude\\claude_desktop_config.json"
-    else:
-        config_path = "~/.config/Claude/claude_desktop_config.json"
+    # if system_info['os'] == 'Darwin':
+    #     config_path = "~/Library/Application Support/Claude/claude_desktop_config.json"
+    # elif system_info['os'] == 'Windows':
+    #     config_path = "%APPDATA%\\Claude\\claude_desktop_config.json"
+    # else:
+    #     config_path = "~/.config/Claude/claude_desktop_config.json"
     
-    print("   • Open Claude Desktop")
-    print("   • Go to Settings → Developer → Edit Config")
-    print(f"   • This will create/open: {config_path}")
-    print("   • Add this configuration:")
+    # print("   • Open Claude Desktop")
+    # print("   • Go to Settings → Developer → Edit Config")
+    # print(f"   • This will create/open: {config_path}")
+    # print("   • Add this configuration:")
     print()
-    print(f"{Colors.BLUE}{claude_config}{Colors.END}")
+    # print(f"{Colors.BLUE}{claude_config}{Colors.END}")
     print()
     
     print(f"{Colors.CYAN}4. Security Recommendations:{Colors.END}")
@@ -625,7 +625,7 @@ def main() -> int:
             print("   • Homebrew integration")
             print("   • Xcode Command Line Tools check")
             print("   • Apple Silicon / Intel Mac optimization")
-            print("   • Claude Desktop integration setup")
+            # print("   • Claude Desktop integration setup")
         elif system_info['os'] == 'Linux':
             if 'debian' in platform_script.name:
                 print("   • APT package manager integration")
