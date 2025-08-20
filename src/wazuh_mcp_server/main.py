@@ -4450,30 +4450,29 @@ class WazuhMCPServer:
         """Get critical vulnerabilities across agents."""
         agents = agents_data.get("data", {}).get("affected_items", [])
         active_agents = [a for a in agents if a.get("status") == "active"][:20]  # Limit to 10 agents Total Agents 10 limit
-        
         critical_vulns = []
         
         # Fetch vulnerabilities concurrently for better performance
         async def fetch_agent_vulnerabilities(agent):
             try:
-                vuln_data = await self.api_client.get_agent_vulnerabilities(agent["id"])
+                vuln_data = await self.api_client.get_agent_vulnerabilities(agent["id"] , agent.get("name"))
                 vulns = vuln_data.get("data", {}).get("affected_items", [])
                 
                 agent_critical_vulns = []
                 for vuln in vulns:
-                    severity = vuln.get("severity", "").lower()
+                    vuln_info = vuln.get("vulnerability", {})
+                    severity = vuln_info.get("severity", "").lower()
                     if severity in ["critical", "high"]:
                         agent_critical_vulns.append({
                             "agent_id": agent["id"],
                             "agent_name": agent.get("name"),
-                            "vulnerability": vuln.get("title"),
+                            "vulnerability": vuln_info.get("description",""),
                             "severity": severity,
-                            "cve": vuln.get("cve", "N/A")
+                            "cve": vuln_info.get("id", "N/A") #----> id ---> cve
                         })
                 from wazuh_mcp_server.utils import get_logger
                 logger = get_logger(__name__)
-                logger.error(f'Agent info has been fetched for agent {agent["id"]} and total vulnerabilities are: {len(agent_critical_vulns)}')
-                
+                logger.error(f'Agent info has been fetched for agent id : {agent["id"]}  and name: {agent.get("name")}  and total vulnerabilities are: {len(agent_critical_vulns)}')
                 return agent_critical_vulns
             except Exception as e:
                 self.logger.warning(f"Could not get vulnerabilities for agent {agent['id']}: {str(e)}")

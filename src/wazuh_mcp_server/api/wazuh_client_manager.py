@@ -142,12 +142,12 @@ class WazuhClientManager:
                     )
                 raise
     
-    async def get_agent_vulnerabilities(self, agent_id: str) -> Dict[str, Any]:
+    async def get_agent_vulnerabilities(self, agent_id: str , agent_name : str) -> Dict[str, Any]:
         """Get vulnerabilities for an agent using appropriate API."""
         
         if self._should_use_indexer_for_vulnerabilities():
             logger.debug("Using Indexer API for vulnerabilities")
-            return await self.indexer_client.search_vulnerabilities(agent_id=agent_id)
+            return await self.indexer_client.search_vulnerabilities(agent_id=agent_id , agent_name = agent_name)
         else:
             logger.debug("Using Server API for vulnerabilities")
             try:
@@ -156,12 +156,13 @@ class WazuhClientManager:
                 # If Server API fails and we have Indexer, try fallback
                 if self.indexer_client and "404" in str(e):
                     logger.warning("Server API vulnerability endpoint not found, falling back to Indexer API")
-                    return await self.indexer_client.search_vulnerabilities(agent_id=agent_id)
+                    return await self.indexer_client.search_vulnerabilities(agent_id=agent_id , agent_name=agent_name)
                 raise
     
     async def search_vulnerabilities(
         self, 
         agent_id: Optional[str] = None,
+        agent_name: Optional[str] = None,
         cve_id: Optional[str] = None,
         limit: int = 100
     ) -> Dict[str, Any]:
@@ -171,6 +172,7 @@ class WazuhClientManager:
         
         return await self.indexer_client.search_vulnerabilities(
             agent_id=agent_id,
+            agent_name=agent_name,
             cve_id=cve_id,
             limit=limit
         )

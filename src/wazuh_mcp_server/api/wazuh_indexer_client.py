@@ -421,21 +421,22 @@ class WazuhIndexerClient:
     async def search_vulnerabilities(
         self, 
         agent_id: Optional[str] = None,
+        agent_name: Optional[str] = None,
         cve_id: Optional[str] = None,
-        limit: int = 100
+        limit: int = 100 #-->100
     ) -> Dict[str, Any]:
         """Search vulnerabilities in Wazuh Indexer."""
         
         query = {
-            "size": min(limit, 1000),
-            "sort": [
-                {
-                    "vulnerability.detected_at": {
-                        "order": "desc"
-                    }
-                }
-            ],
-            "query": {
+            "size": min(limit, 1000), #-->1000
+            # "sort": [
+            #     {
+            #         "id": {                           #vulnerability.detected_at --> id
+            #             "order": "desc"
+            #         }
+            #     }
+            # ],
+             "query": {
                 "bool": {
                     "must": []
                 }
@@ -444,10 +445,12 @@ class WazuhIndexerClient:
         
         # Add filters
         clean_agent_id = None
+        clean_gent_name = None
         if agent_id:
-            clean_agent_id = sanitize_string(agent_id, 20)
+            # clean_agent_id = sanitize_string(agent_id, 20) # chnaged agent.id --> agent.name
+            clean_gent_name = agent_name.strip()
             query["query"]["bool"]["must"].append({
-                "term": {"agent.id": clean_agent_id}
+                "term": {"agent.name": clean_gent_name}    #changed agent.id --> agent.name
             })
         
         clean_cve_id = None
@@ -462,24 +465,27 @@ class WazuhIndexerClient:
             query["query"] = {"match_all": {}}
         
         logger.error(f"Searching vulnerabilities in Indexer", extra={
-            "details": {"agent_id": agent_id, "cve_id": cve_id, "limit": limit}
+            "details": {"agent_id": agent_id, "agent_name": agent_name, "cve_id": cve_id, "limit": limit}
         }  )
         
         vuln_index = "threathawk-vulnerabilities"
-        logger.info("Indexer vulnerability search request", extra={
-            "details": {
-                "endpoint": f"/{vuln_index}/_search",
-                "index_pattern": vuln_index,
-                "payload": query,
-                "params": {
-                    "agent_id_raw": agent_id,
-                    "agent_id_sanitized": clean_agent_id,
-                    "cve_id_raw": cve_id,
-                    "cve_id_sanitized": clean_cve_id
-                }
-            }
-        })
         result = await self._request("POST", f"/{vuln_index}/_search", data=query)
+        
+        # logger.info("Indexer vulnerability search request", extra={
+        #     "details": {
+        #         "endpoint": f"/{vuln_index}/_search",
+        #         "index_pattern": vuln_index,
+        #         "payload": query,
+        #         "params": {
+        #             "agent_id_raw": agent_id,
+        #             "agent_name":agent_name,
+        #             "agent_id_sanitized": clean_agent_id,
+        #             "cve_id_raw": cve_id,
+        #             "response": result
+        #             # "cve_id_sanitized": clean_cve_id
+        #         }
+        #     }
+        # })
         
         # Transform to match Server API format
         return self._transform_vulnerabilities_response(result)
@@ -488,6 +494,7 @@ class WazuhIndexerClient:
         """Transform Indexer response to match Server API format."""
         hits = indexer_response.get("hits", {})
         total = hits.get("total", {})
+        
         
         # Handle different total formats
         total_count = total.get("value", 0) if isinstance(total, dict) else total
@@ -510,17 +517,26 @@ class WazuhIndexerClient:
     
     def _transform_vulnerabilities_response(self, indexer_response: Dict[str, Any]) -> Dict[str, Any]:
         """Transform vulnerabilities response to match Server API format."""
+        
         hits = indexer_response.get("hits", {})
         total = hits.get("total", {})
-        
         # Handle different total formats
         total_count = total.get("value", 0) if isinstance(total, dict) else total
         
         vulnerabilities = []
+       
         for hit in hits.get("hits", []):
             source = hit.get("_source", {})
             vulnerabilities.append(source)
         
+        # logger.info("Indexer vulnerability search response:", extra={
+        #     "details": {
+        #         "vulnerabilities": f"{vulnerabilities}",
+        #         "Total": total_count,
+        #         "hits": len(hits.get("hits", []))
+        #     }
+        # })
+
         return {
             "data": {
                 "affected_items": vulnerabilities,

@@ -37,8 +37,8 @@ class Colors:
 def print_header():
     """Print setup header with branding."""
     print(f"{Colors.CYAN}{'=' * 70}")
-    print(f"   {Colors.BOLD}WAZUH MCP SERVER - INTELLIGENT SETUP{Colors.END}")
-    print(f"   {Colors.BLUE}Secure Integration for Claude Desktop & Wazuh SIEM{Colors.END}")
+    print(f"   {Colors.BOLD}Threat-Hawk SERVER - INTELLIGENT SETUP{Colors.END}")
+    # print(f"   {Colors.BLUE}Secure Integration for Claude Desktop & Wazuh SIEM{Colors.END}")
     print(f"{Colors.CYAN}{'=' * 70}{Colors.END}")
     print()
 
@@ -259,7 +259,7 @@ def install_package(python_exe: str, pip_exe: str) -> bool:
     print_info("Installing Wazuh MCP Server package...")
     
     try:
-        cmd = [pip_exe, "install", "-e", "."]
+        cmd = [pip_exe, "install", "-e", "."]  #This installs the wazuh_mcp_server package
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         print_success("Wazuh MCP Server package installed")
         return True
@@ -504,7 +504,7 @@ def generate_claude_config(system_info: Dict[str, str]) -> str:
 def show_completion_message(system_info: Dict[str, str]):
     """Show comprehensive completion message with next steps."""
     activate_cmd, python_exe, _ = get_activation_info(system_info)
-    claude_config = generate_claude_config(system_info)
+    # claude_config = generate_claude_config(system_info)
     
     print()
     print(f"{Colors.GREEN}{'=' * 70}")
@@ -530,20 +530,20 @@ def show_completion_message(system_info: Dict[str, str]):
     
     print(f"{Colors.CYAN}3. Claude Desktop Integration:{Colors.END}")
     
-    # OS-specific Claude Desktop paths
-    if system_info['os'] == 'Darwin':
-        config_path = "~/Library/Application Support/Claude/claude_desktop_config.json"
-    elif system_info['os'] == 'Windows':
-        config_path = "%APPDATA%\\Claude\\claude_desktop_config.json"
-    else:
-        config_path = "~/.config/Claude/claude_desktop_config.json"
+    # # OS-specific Claude Desktop paths
+    # if system_info['os'] == 'Darwin':
+    #     config_path = "~/Library/Application Support/Claude/claude_desktop_config.json"
+    # elif system_info['os'] == 'Windows':
+    #     config_path = "%APPDATA%\\Claude\\claude_desktop_config.json"
+    # else:
+    #     config_path = "~/.config/Claude/claude_desktop_config.json"
     
     print("   • Open Claude Desktop")
     print("   • Go to Settings → Developer → Edit Config")
-    print(f"   • This will create/open: {config_path}")
+    # print(f"   • This will create/open: {config_path}")
     print("   • Add this configuration:")
     print()
-    print(f"{Colors.BLUE}{claude_config}{Colors.END}")
+    # print(f"{Colors.BLUE}{claude_config}{Colors.END}")
     print()
     
     print(f"{Colors.CYAN}4. Security Recommendations:{Colors.END}")
@@ -667,7 +667,7 @@ def main() -> int:
     setup_steps.extend([
         ("Upgrading pip and tools", lambda: upgrade_pip(python_exe)),
         ("Installing dependencies", lambda: install_dependencies(python_exe, pip_exe)),
-        ("Installing Wazuh MCP Server", lambda: install_package(python_exe, pip_exe)),
+        ("Installing Wazuh MCP Server", lambda: install_package(python_exe, pip_exe)),   #this installs wazuh MCP server peckage 
         ("Setting up configuration", lambda: setup_configuration_files()),
         ("Validating configuration", lambda: validate_configuration()),
         ("Testing installation", lambda: test_installation(python_exe)),
