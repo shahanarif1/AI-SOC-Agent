@@ -3235,6 +3235,7 @@ class WazuhMCPServer:
         """Safely fetch vulnerabilities for a single agent."""
         try:
             agent_id = agent.get("id")
+            agent_name = agent.get("name")
             if not agent_id:
                 return []
             
@@ -3791,6 +3792,7 @@ class WazuhMCPServer:
         # Process agents to find critical vulnerabilities
         for agent in agents:
             agent_id = agent.get("id")
+            agent_name = agent.get("name")
             if not agent_id:
                 continue
             
@@ -4451,7 +4453,7 @@ class WazuhMCPServer:
         agents = agents_data.get("data", {}).get("affected_items", [])
         active_agents = [a for a in agents if a.get("status") == "active"][:20]  # Limit to 10 agents Total Agents 10 limit
         critical_vulns = []
-        
+
         # Fetch vulnerabilities concurrently for better performance
         async def fetch_agent_vulnerabilities(agent):
             try:
@@ -4469,6 +4471,7 @@ class WazuhMCPServer:
                             "vulnerability": vuln_info.get("description",""),
                             "severity": severity,
                             "cve": vuln_info.get("id", "N/A") #----> id ---> cve
+                            # "peckage_name": package_.get("name", "N/A")
                         })
                 from wazuh_mcp_server.utils import get_logger
                 logger = get_logger(__name__)
@@ -4479,18 +4482,16 @@ class WazuhMCPServer:
                 return []
         
         # Execute all vulnerability fetches concurrently
-        tasks = [fetch_agent_vulnerabilities(agent) for agent in active_agents]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        tasks = [fetch_agent_vulnerabilities(agent) for agent in active_agents] # tasks contain total vulnerability across 1 agent:
+        results = await asyncio.gather(*tasks, return_exceptions=True)          # result contain vulnerabilities across all agents
         
         # Flatten results and filter out exceptions
         for result in results:
             if isinstance(result, list):
                 critical_vulns.extend(result)
-        
         return {
             "total_critical_vulnerabilities": len(critical_vulns),
-            "vulnerabilities": critical_vulns[:50],  # Limit response size      50 is the limit set by the API
- 
+            "vulnerabilities": critical_vulns[:200],  # Limit response size      50 is the limit set by the API
             "agents_checked": len(active_agents)
         }
     

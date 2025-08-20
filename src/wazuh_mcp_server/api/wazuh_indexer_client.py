@@ -444,13 +444,13 @@ class WazuhIndexerClient:
         }
         
         # Add filters
-        clean_agent_id = None
+        # clean_agent_id = None
         clean_gent_name = None
         if agent_id:
             # clean_agent_id = sanitize_string(agent_id, 20) # chnaged agent.id --> agent.name
-            clean_gent_name = agent_name.strip()
+            clean_agent_name = agent_name.strip()
             query["query"]["bool"]["must"].append({
-                "term": {"agent.name": clean_gent_name}    #changed agent.id --> agent.name
+                "term": {"agent.name": clean_agent_name}    #changed agent.id --> agent.name
             })
         
         clean_cve_id = None
@@ -471,23 +471,6 @@ class WazuhIndexerClient:
         vuln_index = "threathawk-vulnerabilities"
         result = await self._request("POST", f"/{vuln_index}/_search", data=query)
         
-        # logger.info("Indexer vulnerability search request", extra={
-        #     "details": {
-        #         "endpoint": f"/{vuln_index}/_search",
-        #         "index_pattern": vuln_index,
-        #         "payload": query,
-        #         "params": {
-        #             "agent_id_raw": agent_id,
-        #             "agent_name":agent_name,
-        #             "agent_id_sanitized": clean_agent_id,
-        #             "cve_id_raw": cve_id,
-        #             "response": result
-        #             # "cve_id_sanitized": clean_cve_id
-        #         }
-        #     }
-        # })
-        
-        # Transform to match Server API format
         return self._transform_vulnerabilities_response(result)
     
     def _transform_alerts_response(self, indexer_response: Dict[str, Any]) -> Dict[str, Any]:
