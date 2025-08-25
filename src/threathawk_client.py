@@ -69,25 +69,59 @@ class MCPClient:
         """
         if not previous_answer:
             return False
-        system_prompt = (
-            "You are an intelligent SOC assistant. Given the user's query, the previous answer/context, and the list of all available resources, "
-            "decide if the query is a follow-up question that depends on the previous answer/context, or does it require more resources to read data from to fully answer the user's query (perform a new query)."
-            # "If you think you dont have context to fully answer users query , perform a new query."
-            "Reply with only 'follow-up' or 'new'."
-        )
-        resource_info = f"\nAvailable resources:\n{resource_list}" if resource_list else ""
+            
+        # Enhanced system prompt for better follow-up detection
+        system_prompt = """You are a cybersecurity assistant analyzing if a user's query is a follow-up question.
+
+         CRITERIA FOR FOLLOW-UP QUESTIONS:
+        - References previous data/context (e.g., "What about the other agents?", "Show me more details")
+        - Asks for clarification or expansion of previous information
+        - Uses pronouns like "it", "they", "those", "this" referring to previous context
+        - Asks "why", "how", "when", "where" about previously mentioned items
+        - Requests additional analysis of the same data
+        - Asks for comparisons or relationships between previously mentioned items
+
+        CRITERIA FOR NEW QUERIES:
+        - Asks for completely different information not in previous context
+        - Requests data from different resources
+        - Asks about unrelated topics or systems
+        - Uses specific names/IDs not mentioned before
+
+        Previous context: {previous_answer}
+
+        User query: {query}
+
+        # Analyze if this is a follow-up question based on the criteria above.
+        # Respond with ONLY: "follow-up" or "new"
+        """
+        
         messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Previous answer/context: {previous_answer}\nUser query: {query}{resource_info}"}
+            {"role": "system", "content": system_prompt.format(previous_answer=previous_answer[:500], query=query)},
+            {"role": "user", "content": f"Previous context: {previous_answer[:500]}\nUser query: {query}"}
         ]
-        completion = self.chat_client.chat.completions.create(
-            messages=messages,
-            max_completion_tokens=10,
-            temperature=0.0,
-            model=self.model_name
-        )
-        reply = completion.choices[0].message.content.strip().lower()
-        return reply.startswith("follow-up")
+        
+        try:
+            completion = self.chat_client.chat.completions.create(
+                messages=messages,
+                max_completion_tokens=5,
+                temperature=0.0,
+                model=self.model_name
+            )
+            reply = completion.choices[0].message.content.strip().lower()
+            print(f"[DEBUG] Follow-up detection - Query: '{query}' | Reply: '{reply}' | Is follow-up: {reply.startswith('follow-up')}")
+            return reply.startswith("follow-up")
+        except Exception as e:
+            print(f"[ERROR] Follow-up detection failed: {e}")
+            # Fallback: simple keyword-based detection
+            follow_up_indicators = [
+                "what about", "how about", "tell me more", "show me more", "give me more",
+                "explain", "why", "when", "where", "how", "which", "what else",
+                "it", "this", "that", "these", "those", "they", "them",
+                "the other", "others", "remaining", "rest", "additional",
+                "compare", "difference", "similar", "related", "connection"
+            ]
+            query_lower = query.lower()
+            return any(indicator in query_lower for indicator in follow_up_indicators)
     
     # --- Building Query Understanding  ---
     async def built_understanding(self, query:str , resource_list) ->str:
@@ -143,9 +177,12 @@ class MCPClient:
             - Do NOT explain anything. Just output the exact matching resource name(s).
             """
         user_prompt = f'''
-            #{query}
+        #{query}
 
-            '''
+        #IMPORTANT: Format the response using bullet points, paragraphs, or numbered lists. Avoid tables unless comparing 3+ agents side-by-side.
+        #Keep the response concise (max 300-400 words) and well-formatted for chat display.
+        #If there's extensive data, provide a summary with key points only.
+         '''
         try:
             completion = self.chat_client.chat.completions.create(messages = [{'role': 'system' , 'content':assistant_prompt}
                                                                                ,{'role':'user' , 'content':user_prompt}],
@@ -205,23 +242,51 @@ class MCPClient:
         context = "\n\n".join([f"{k}:\n{json.dumps(v, indent=2)}" for k, v in matched_data.items()])
 
         system_prompt = f"""
-                    #You are a SOC analyst. Read the data and Format the data as clean report or summary for the user based on their query.
-                    #so the user is able to understnad the response by just reading it. 
+                    #You are a SOC analyst. Read the data and provide a clear, informative response based on the user's query.
+                    
+                    #CRITICAL FORMATTING RULES:
+                    #- DO NOT use tables for agent information unless explicitly comparing 3+ agents side-by-side
+                    #- For agent data, use bullet points, paragraphs, or numbered lists instead
+                    #- Tables should be used ONLY for comparing multiple items with identical properties
+                    #- Prefer natural language descriptions over structured tables
+                    
+                    #CONTENT LENGTH MANAGEMENT:
+                    #- Keep responses concise and focused (max 300-400 words)
+                    #- If data is extensive, provide a summary with key points
+                    #- Use "..." to indicate when there's more data available
+                    #- Break long lists into smaller, manageable chunks
+                    #- Focus on the most relevant information for the user's query
+                    
+                    #AGENT DATA FORMATTING:
+                    #- Single agent info: Use paragraphs and bullet points
+                    #- Multiple agents: Use bullet points with agent names as headers
+                    #- Agent status: Use descriptive text, not tables
+                    #- Agent details: Use organized bullet points or numbered lists
+                    
+                    #Examples of GOOD formatting for agents:
+                    #- "Agent-001 is currently active and running on Windows 10. It has 2 active alerts and 1 vulnerability."
+                    #- "Found 3 agents: • Agent-001 (Active) • Agent-002 (Inactive) • Agent-003 (Active)"
+                    #- "Agent Status Summary: 1. Agent-001: Active, 2 alerts 2. Agent-002: Inactive, 0 alerts"
+                    
                     #Here is the Data:
                     #{context}
 
-                    #Reply clearly, needed detail not more, and professionally.
+                    #Reply clearly, professionally, and in a way that's easy to read and understand.
                     #Replace Wazuh with Threathawk whenever you find it.
+                    #AVOID TABLES for agent information unless absolutely necessary for comparison.
                     """
         user_prompt = f'''
         #{query}
 
+        #IMPORTANT: Format the response using bullet points, paragraphs, or numbered lists. Avoid tables unless comparing 3+ agents side-by-side.
+        #Keep the response concise (max 300-400 words) and well-formatted for chat display.
+        #If there's extensive data, provide a summary with key points only.
          '''
 
         try:
             result = self.chat_client.chat.completions.create(messages = [{'role': 'assistant' , 'content':system_prompt}
                                                                                ,{'role':'user' , 'content':user_prompt}],
-                                                                               max_completion_tokens = 1000,
+                                                                               max_completion_tokens = 600,
                                                                                temperature = 1.0,
                                                                                top_p=1.0,
                                                                                frequency_penalty=0.0,
@@ -273,22 +338,50 @@ class MCPClient:
 
                 context_str = json.dumps(parsed_json, indent=2)
                 system_prompt = f"""
-                    #You are a SOC analyst. Read the data and Format the data as clean report or summary for the user based on their query.
-                    #so the user is able to understnad the response just reading it.
+                    #You are a SOC analyst. Read the data and provide a clear, informative response based on the user's query.
+                    
+                    #CRITICAL FORMATTING RULES:
+                    #- DO NOT use tables for agent information unless explicitly comparing 3+ agents side-by-side
+                    #- For agent data, use bullet points, paragraphs, or numbered lists instead
+                    #- Tables should be used ONLY for comparing multiple items with identical properties
+                    #- Prefer natural language descriptions over structured tables
+                    
+                    #CONTENT LENGTH MANAGEMENT:
+                    #- Keep responses concise and focused (max 300-400 words)
+                    #- If data is extensive, provide a summary with key points
+                    #- Use "..." to indicate when there's more data available
+                    #- Break long lists into smaller, manageable chunks
+                    #- Focus on the most relevant information for the user's query
+                    
+                    #AGENT DATA FORMATTING:
+                    #- Single agent info: Use paragraphs and bullet points
+                    #- Multiple agents: Use bullet points with agent names as headers
+                    #- Agent status: Use descriptive text, not tables
+                    #- Agent details: Use organized bullet points or numbered lists
+                    
+                    #Examples of GOOD formatting for agents:
+                    #- "Agent-001 is currently active and running on Windows 10. It has 2 active alerts and 1 vulnerability."
+                    #- "Found 3 agents: • Agent-001 (Active) • Agent-002 (Inactive) • Agent-003 (Active)"
+                    #- "Agent Status Summary: 1. Agent-001: Active, 2 alerts 2. Agent-002: Inactive, 0 alerts"
+                    
                     #Here is the Data:
                     #{context_str}
 
-                    #Reply clearly, and professionally.
+                    #Reply clearly, professionally, and in a way that's easy to read and understand.
                     #Replace Wazuh with Threathawk whenever you find it.
+                    #AVOID TABLES for agent information unless absolutely necessary for comparison.
                     """
                 user_prompt = f'''
-                    #{query}
+        #{query}
 
-                    '''
+        #IMPORTANT: Format the response using bullet points, paragraphs, or numbered lists. Avoid tables unless comparing 3+ agents side-by-side.
+        #Keep the response concise (max 300-400 words) and well-formatted for chat display.
+        #If there's extensive data, provide a summary with key points only.
+         '''
                 try:
                     result = self.chat_client.chat.completions.create(messages = [{'role': 'assistant' , 'content':system_prompt}
                                                                                ,{'role':'user' , 'content':user_prompt}],
-                                                                               max_completion_tokens = 1000,
+                                                                               max_completion_tokens = 600,
                                                                                temperature = 1.0,
                                                                                top_p=1.0,
                                                                                frequency_penalty=0.0,
@@ -314,6 +407,36 @@ class MCPClient:
 
     async def close(self):
         await self.exit_stack.aclose()
+    
+    # --- Test follow-up detection ---
+    async def test_followup_detection(self):
+        """
+        Test function to verify follow-up detection is working
+        """
+        test_cases = [
+            {
+                "previous": "Found 5 active agents: Agent-001, Agent-002, Agent-003, Agent-004, Agent-005",
+                "query": "What about the other agents?",
+                "expected": True
+            },
+            {
+                "previous": "Critical alerts: 3 high severity alerts detected",
+                "query": "Show me system health",
+                "expected": False
+            },
+            {
+                "previous": "Agent-001 has 2 vulnerabilities",
+                "query": "Tell me more about it",
+                "expected": True
+            }
+        ]
+        
+        print("\n=== Testing Follow-up Detection ===")
+        for i, test in enumerate(test_cases):
+            result = await self.is_follow_up(test["query"], test["previous"])
+            status = "✅ PASS" if result == test["expected"] else "❌ FAIL"
+            print(f"Test {i+1}: {status} | Query: '{test['query']}' | Expected: {test['expected']} | Got: {result}")
+        print("=== End Test ===\n")
 
 
 def main_page_setup():
@@ -394,11 +517,11 @@ def main_page_setup():
 st.set_page_config(
     page_title="Threat Hawk Smart Monitoring System",
     page_icon="🛡️",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    layout="centered",
+    initial_sidebar_state="collapsed",
     menu_items={
-        'Get Help': 'https://github.com/your-repo/threat-hawk',
-        'Report a bug': 'https://github.com/your-repo/threat-hawk/issues',
+        'Get Help': 'https://github.comshahanarif1/AI-SOC-Agent/threat-hawk',
+        'Report a bug': 'https://github.comshahanarif1/AI-SOC-Agent/issues',
         'About': 'Threat Hawk is an intelligent cybersecurity monitoring system powered by AI.'
     }
 )
@@ -422,7 +545,7 @@ with st.container():
         main_page_setup()
     else:
         # Show compact welcome when chat is active
-        with st.expander("📋 Show Guide (Click to expand)", expanded=True):
+        with st.expander("📋 Welcome Guide (Click to expand)", expanded=True):
             main_page_setup()
 
 # MCP Connection Setup
@@ -436,6 +559,12 @@ if not st.session_state.connected:
     with st.spinner("Connecting to Threat Hawk server..."):
         asyncio.run(setup_mcp())
         loop = asyncio.new_event_loop()
+        
+        # Test follow-up detection after connection
+        try:
+            asyncio.run(st.session_state.mcp_client.test_followup_detection())
+        except Exception as e:
+            print(f"[WARNING] Follow-up detection test failed: {e}")
 
 if st.session_state.connected:
     st.success("✅ Connected to Threat Hawk.")
@@ -449,14 +578,44 @@ def _convert_markdown_tables_to_html(text: str) -> str:
         header_cells = [h.strip() for h in match.group(1).split('|')]
         body_lines = [ln.strip().strip('|') for ln in match.group(2).strip().splitlines()]
         rows_html = []
+        
+        # Clean up header cells - remove any markdown formatting
+        clean_headers = []
+        for h in header_cells:
+            # Remove markdown formatting
+            h = re.sub(r'\*\*(.*?)\*\*', r'\1', h)  # Remove bold
+            h = re.sub(r'\*(.*?)\*', r'\1', h)      # Remove italic
+            h = re.sub(r'`(.*?)`', r'\1', h)        # Remove code
+            clean_headers.append(h)
+        
         for ln in body_lines:
             if not ln:
                 continue
             cells = [c.strip() for c in ln.split('|')]
-            rows_html.append('<tr>' + ''.join(f'<td>{c}</td>' for c in cells) + '</tr>')
-        thead = '<thead><tr>' + ''.join(f'<th>{c}</th>' for c in header_cells) + '</tr></thead>'
+            
+            # Clean up cell content and add status classes
+            clean_cells = []
+            for cell in cells:
+                # Remove markdown formatting but preserve content
+                cell = re.sub(r'\*\*(.*?)\*\*', r'\1', cell)  # Remove bold
+                cell = re.sub(r'\*(.*?)\*', r'\1', cell)      # Remove italic
+                
+                # Add status classes for common status indicators
+                cell_lower = cell.lower()
+                if 'active' in cell_lower:
+                    cell = f'<span class="status-active">{cell}</span>'
+                elif 'inactive' in cell_lower or 'offline' in cell_lower:
+                    cell = f'<span class="status-inactive">{cell}</span>'
+                elif 'warning' in cell_lower or 'critical' in cell_lower:
+                    cell = f'<span class="status-warning">{cell}</span>'
+                
+                clean_cells.append(cell)
+            
+            rows_html.append('<tr>' + ''.join(f'<td>{c}</td>' for c in clean_cells) + '</tr>')
+        
+        thead = '<thead><tr>' + ''.join(f'<th>{c}</th>' for c in clean_headers) + '</tr></thead>'
         tbody = '<tbody>' + ''.join(rows_html) + '</tbody>'
-        return f'<table>{thead}{tbody}</table>'
+        return f'<div class="table-container"><table class="chat-table">{thead}{tbody}</table></div>'
 
     return pattern.sub(repl, text)
 
@@ -487,6 +646,50 @@ for i, message in enumerate(st.session_state.messages):
     content = re.sub(r'\*(.*?)\*', r'<em>\1</em>', content)
     # Make lines starting with #... bold and strip the leading # symbols
     content = re.sub(r'(?m)^\s*#{1,6}\s*(.+)$', r'<strong>\1</strong>', content)
+    
+    # Fix ordered and unordered lists - remove excessive spacing
+    # Convert markdown lists to proper HTML lists
+    content = re.sub(r'(?m)^(\s*)(\d+\.)\s+(.+)$', r'\1<li>\3</li>', content)
+    content = re.sub(r'(?m)^(\s*)([-*+]\s+)(.+)$', r'\1<li>\3</li>', content)
+    
+    # Wrap consecutive list items in <ol> or <ul> tags
+    def wrap_lists(text):
+        lines = text.split('\n')
+        result = []
+        in_list = False
+        list_type = None
+        list_items = []
+        
+        for line in lines:
+            # Check if line is a list item
+            ol_match = re.match(r'^\s*<li>(.+?)</li>\s*$', line)
+            ul_match = re.match(r'^\s*<li>(.+?)</li>\s*$', line)
+            
+            if ol_match or ul_match:
+                if not in_list:
+                    in_list = True
+                    list_type = 'ol' if ol_match else 'ul'
+                list_items.append(line)
+            else:
+                # End of list
+                if in_list and list_items:
+                    result.append(f'<{list_type}>')
+                    result.extend(list_items)
+                    result.append(f'</{list_type}>')
+                    list_items = []
+                    in_list = False
+                result.append(line)
+        
+        # Handle list at end of content
+        if in_list and list_items:
+            result.append(f'<{list_type}>')
+            result.extend(list_items)
+            result.append(f'</{list_type}>')
+        
+        return '\n'.join(result)
+    
+    content = wrap_lists(content)
+    
     # Collapse excessive blank lines
     content = re.sub(r'\n{3,}', '\n\n', content)
     # Unwrap any HTML code fences so tags render
@@ -607,6 +810,7 @@ function removeTypingIndicator(typingDiv) {
 # Chat input with improved styling
 st.markdown("""
 <style>
+/* Chat input styling */
 .stChatInput {
     background: #1e293b !important;
     border: 2px solid #334155 !important;
@@ -616,6 +820,14 @@ st.markdown("""
     font-size: 1rem !important;
     padding: 1rem 1.25rem !important;
     transition: all 0.2s ease !important;
+    position: relative !important;
+    z-index: 1000 !important;
+    margin-bottom: 2rem !important;
+}
+
+/* Ensure chat input container has proper spacing */
+.stChatInputContainer {
+    margin-bottom: 1rem !important;
 }
 
 .stChatInput:focus {
@@ -713,11 +925,167 @@ st.markdown("""
     padding: 1rem !important;
 }
 
-/* Spinner styling */
-.stSpinner > div {
-    border-color: #6366f1 !important;
-    border-top-color: transparent !important;
+ /* Spinner styling */
+ .stSpinner > div {
+     border-color: #6366f1 !important;
+     border-top-color: transparent !important;
+ }
+ 
+ /* List styling to reduce spacing */
+ .th-chat ol, .th-chat ul {
+     margin: 0.5rem 0 !important;
+     padding-left: 1.5rem !important;
+ }
+ 
+ .th-chat li {
+     margin: 0.25rem 0 !important;
+     line-height: 1.4 !important;
+ }
+ 
+ .th-chat ol ol, .th-chat ul ul, .th-chat ol ul, .th-chat ul ol {
+     margin: 0.25rem 0 !important;
+ }
+ 
+ /* Table styling for chat bubbles */
+ .table-container {
+     margin: 0.75rem 0 !important;
+     overflow-x: auto !important;
+     border-radius: 8px !important;
+     background: rgba(30, 41, 59, 0.5) !important;
+     border: 1px solid #334155 !important;
+ }
+ 
+ .chat-table {
+     width: 100% !important;
+     border-collapse: collapse !important;
+     font-size: 0.85rem !important;
+     line-height: 1.3 !important;
+     margin: 0 !important;
+     background: transparent !important;
+ }
+ 
+ .chat-table thead {
+     background: rgba(51, 65, 85, 0.8) !important;
+ }
+ 
+ .chat-table th {
+     padding: 0.5rem 0.75rem !important;
+     text-align: left !important;
+     font-weight: 600 !important;
+     color: #f8fafc !important;
+     border-bottom: 2px solid #475569 !important;
+     font-size: 0.8rem !important;
+     text-transform: uppercase !important;
+     letter-spacing: 0.5px !important;
+ }
+ 
+ .chat-table td {
+     padding: 0.5rem 0.75rem !important;
+     border-bottom: 1px solid #334155 !important;
+     color: #cbd5e1 !important;
+     vertical-align: top !important;
+     word-wrap: break-word !important;
+     max-width: 200px !important;
+ }
+ 
+ .chat-table tbody tr:hover {
+     background: rgba(51, 65, 85, 0.3) !important;
+ }
+ 
+ .chat-table tbody tr:last-child td {
+     border-bottom: none !important;
+ }
+ 
+ /* Responsive table handling */
+ @media (max-width: 768px) {
+     .chat-table {
+         font-size: 0.75rem !important;
+     }
+     
+     .chat-table th,
+     .chat-table td {
+         padding: 0.4rem 0.5rem !important;
+         max-width: 150px !important;
+     }
+ }
+ 
+ /* Ensure tables don't overflow chat bubbles */
+ .th-bubble .table-container {
+     max-width: 100% !important;
+     margin-left: 0 !important;
+     margin-right: 0 !important;
+ }
+ 
+ /* Code block styling within tables */
+ .chat-table code {
+     background: rgba(51, 65, 85, 0.8) !important;
+     padding: 0.1rem 0.3rem !important;
+     border-radius: 3px !important;
+     font-family: 'Courier New', monospace !important;
+     font-size: 0.8rem !important;
+     color: #10b981 !important;
+ }
+ 
+ /* Status indicators in tables */
+ .chat-table .status-active {
+     color: #10b981 !important;
+     font-weight: 600 !important;
+ }
+ 
+ .chat-table .status-inactive {
+     color: #ef4444 !important;
+     font-weight: 600 !important;
+ }
+ 
+ .chat-table .status-warning {
+     color: #f59e0b !important;
+     font-weight: 600 !important;
+ }
+ 
+ /* Ensure chat bubbles can accommodate tables */
+.th-bubble {
+    max-width: 100% !important;
+    overflow: hidden !important;
 }
+
+/* Add proper spacing between chat messages and input */
+.th-row {
+    margin-bottom: 1.5rem !important;
+}
+
+/* Ensure last message has proper spacing from input */
+.th-row:last-child {
+    margin-bottom: 2rem !important;
+}
+
+
+ 
+ .th-bubble .th-chat {
+     overflow-x: auto !important;
+     word-wrap: break-word !important;
+ }
+ 
+ /* Improve table readability in chat */
+ .th-chat .table-container {
+     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+ }
+ 
+ /* Compact table for mobile */
+ @media (max-width: 480px) {
+     .chat-table {
+         font-size: 0.7rem !important;
+     }
+     
+     .chat-table th,
+     .chat-table td {
+         padding: 0.3rem 0.4rem !important;
+         max-width: 120px !important;
+     }
+     
+     .table-container {
+         margin: 0.5rem 0 !important;
+     }
+ }
 </style>
 """, unsafe_allow_html=True)
 
@@ -743,14 +1111,22 @@ if prompt := st.chat_input("Ask me something about your security infrastructure.
         mcp_client = st.session_state.mcp_client
         resource_list = "\n".join([f"- {desc}" for desc in mcp_client.resource_map.keys()])
         is_followup = await mcp_client.is_follow_up(prompt, previous_answer, resource_list)
+        print(f"[DEBUG] Follow-up detection result: {is_followup}")
+        print(f"[DEBUG] Previous answer exists: {previous_answer is not None}")
+        print(f"[DEBUG] Previous answer length: {len(previous_answer) if previous_answer else 0}")
         if not previous_answer:
             print(f"[INFO] Is follow-up: {is_followup}, Previous answer: {previous_answer}")
         else:
             print(f"[INFO] Is follow-up: {is_followup}")
-        # Future: If is_followup and query is about vulnerabilities, trigger web search here
-        if is_followup and ("cve" in prompt.lower() and "remediation" in prompt.lower()):
+            print(f"[DEBUG] Previous answer preview: {previous_answer[:200]}...")
+        # Check for CVE-related queries (both follow-up and new queries)
+        cve_keywords = ["cve", "vulnerability", "exploit", "patch", "advisory", "security advisory"]
+        is_cve_query = any(keyword in prompt.lower() for keyword in cve_keywords)
+        
+        # Trigger web search for CVE queries (both follow-up and new)
+        if is_cve_query:
             # conversation_messages.append({"role": "user", "content": prompt})
-            print("[INFO] Triggering web search for CVE_ID...")                 #Debug Print
+            print("[INFO] Triggering web search for vulnerability query...")
             system_prompt = (f"""
             You are a cybersecurity assistant specializing in vulnerability research and remediation.
             I will provide a single CVE ID and its related package name if package name is available.
@@ -772,6 +1148,7 @@ if prompt := st.chat_input("Ask me something about your security infrastructure.
 
                 One-line CVE summary
 
+                Also return External URL for vulnerabilities if available. for example: https://msrc.microsoft.com/update-guide/vulnerability/CVE-2025-50166 for CVE-2025-50166
                 """)
 
             messages = [
@@ -784,7 +1161,7 @@ if prompt := st.chat_input("Ask me something about your security infrastructure.
             temperature=0.7,
             model=mcp_client.model_name
             )
-            response = completion.choices[0].message.content.strip().lower()
+            response = completion.choices[0].message.content.strip()
 
             st.session_state.memory.chat_memory.add_ai_message(response)
             return response
@@ -885,7 +1262,7 @@ with st.sidebar:
         with col1:
             st.metric("Messages", len(st.session_state.messages))
         with col2:
-            st.metric("Limit", "10", delta="Remaining: " + str(10 - len(st.session_state.messages)))
+            st.metric("Context limit", "10", delta="" + str(10 - len(st.session_state.messages)))
         
         # Action buttons
         if len(st.session_state.messages) > 0:
@@ -961,13 +1338,55 @@ with st.sidebar:
             # Add to memory
             st.session_state.memory.chat_memory.add_user_message(question)
             
-            # Generate response
+                         # Generate response
             async def handle_quick_response():
                 previous_answer = st.session_state.get("last_data")
                 mcp_client = st.session_state.mcp_client
                 resource_list = "\n".join([f"- {desc}" for desc in mcp_client.resource_map.keys()])
                 is_followup = await mcp_client.is_follow_up(question, previous_answer, resource_list)
-                
+                 
+                 # Check for CVE-related queries in quick actions too
+                cve_keywords = ["cve", "vulnerability", "exploit", "patch", "advisory", "security advisory"]
+                is_cve_query = any(keyword in question.lower() for keyword in cve_keywords)
+                 
+                 # Trigger web search for CVE queries (both follow-up and new)
+                if is_cve_query:
+                    print("[INFO] Triggering web search for vulnerability query from quick action...")
+                    system_prompt = (f"""
+                     You are a cybersecurity assistant specializing in vulnerability research and remediation.
+                     
+                     User Query: {question}
+                     
+                     Your task:
+                         1. If the query contains a specific CVE ID (e.g., CVE-2023-12345), search for that specific vulnerability
+                         2. If the query is about general vulnerabilities, security advisories, or exploits, search for relevant recent information
+                         3. Search authoritative sources (NVD, MITRE, vendor advisories, security blogs, exploit databases, GitHub if applicable) for the latest technical details
+                         4. Provide accurate, up-to-date information about the vulnerability or security topic
+                         
+                     Output Format:
+                         - Brief summary of the vulnerability/security issue
+                         - Key technical details (affected products, versions, severity, exploitability)
+                         - Recommended actions or remediation steps
+                         - External URLs for official advisories if available
+                         
+                     For External Source vulnerabilities, include the URL for the vulnerability.
+                     """)
+                     
+                    messages = [
+                         {"role": "system", "content": system_prompt},
+                         {"role": "user", "content": f"User query: {question}"}
+                     ]
+                    completion = mcp_client.chat_client.chat.completions.create(
+                         messages=messages,
+                         max_completion_tokens=1500,
+                         temperature=0.7,
+                         model=mcp_client.model_name
+                     )
+                    response = completion.choices[0].message.content.strip()
+                     
+                    st.session_state.memory.chat_memory.add_ai_message(response)
+                    return response
+                 
                 if is_followup and previous_answer:
                     # Use previous context for follow-up
                     context_data = previous_answer
@@ -1040,6 +1459,6 @@ with st.sidebar:
     # System info
     st.markdown("---")
     st.markdown("### ℹ️ System Info")
-    st.caption("Version: 2.0.0")
+    st.caption("Version: 1.0.0")
     st.caption("Status: Active")
     st.caption("Last Updated: " + st.session_state.get("conversation_start_time", "N/A"))

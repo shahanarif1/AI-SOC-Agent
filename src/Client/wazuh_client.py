@@ -14,20 +14,16 @@ from pathlib import Path
 
 nest_asyncio.apply()
 load_dotenv()
-
-PROJ_ROOT = Path(__file__).resolve().parent.parent.parent
+project_root = Path(__file__).resolve().parent.parent.parent
 MCP_SERVER_PATH = os.getenv("MCP_SERVER_PATH")
 SUBSCRIPTION_KEY = os.getenv("OPENAI_API_KEY")
 END_POINT = os.getenv("END_POINT")
-ENV_PATH = PROJ_ROOT / '.env'
-SERVER_PATH = PROJ_ROOT /'src'/'wazuh_mcp_server'/'main.py'
-PYTHON_PATH = PROJ_ROOT / 'venv' / 'bin' / 'python.exe'
-
-# print(f'This is the main file path {Path(__file__).resolve().parent.parent.parent}')
-
-# print(f'These are the paths {ENV_PATH} and Server path:{SERVER_PATH}')
-# import sys
-# sys.exit(0)
+ENV_PATH = project_root / '.env'
+SERVER_PATH = project_root /'src'/'wazuh_mcp_server'/'main.py'
+PYTHON_PATH = project_root / 'venv' / 'bin' / 'python.exe'
+css_path = Path(__file__).resolve().parent / 'Styles.css'
+with open(css_path) as f:
+    css_content = f.read()
 
 # --- MCP Client Class ---
 class MCPClient:
@@ -63,7 +59,35 @@ class MCPClient:
                 "description": res.description,
                 "data": content.contents[0] if content.contents else {}
             }
-
+    
+    # --- Helper: Decide if query is follow-up ---
+    async def is_follow_up(self, query: str, previous_answer: str = None, resource_list: str = None) -> bool:
+        """
+        Uses LLM to decide if the query is a follow-up to the previous answer, considering the resource list and previous context.
+        Returns True if follow-up, False if new query.
+        """
+        if not previous_answer:
+            return False
+        system_prompt = (
+            "You are an intelligent SOC assistant. Given the user's query, the previous answer/context, and the list of all available resources, "
+            "decide if the query is a follow-up question that depends on the previous answer/context, or does it require more resources to read data from to fully answer the user's query (perform a new query)."
+            # "If you think you dont have context to fully answer users query , perform a new query."
+            "Reply with only 'follow-up' or 'new'."
+        )
+        resource_info = f"\nAvailable resources:\n{resource_list}" if resource_list else ""
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Previous answer/context: {previous_answer}\nUser query: {query}{resource_info}"}
+        ]
+        completion = self.chat_client.chat.completions.create(
+            messages=messages,
+            max_completion_tokens=10,
+            temperature=0.0,
+            model=self.model_name
+        )
+        reply = completion.choices[0].message.content.strip().lower()
+        return reply.startswith("follow-up")
+    
     # --- Building Query Understanding  ---
     async def built_understanding(self, query:str , resource_list) ->str:
         assistant_prompt = f"""
@@ -290,6 +314,33 @@ class MCPClient:
     async def close(self):
         await self.exit_stack.aclose()
 
+
+def main_page_setup():
+    st.subheader('Welcome to Threat Hawk 🧠 Smart Monitoring System!')
+    st.markdown('''
+            Where you can Monitor your Network. By talking to our smart monitoring sytem and getting real time results.
+            Please follow the instructions below to get started:
+        ''')
+    st.subheader("Sample FAQ's ")
+    st.markdown("🕵️ : -Show me Active and non-Active Agents")
+    st.markdown("🕵️ : -Show me Critical Alerts in last 24 Hours")
+    st.markdown("🕵️ : -Show Over-all system Health ")
+
+    col1 , col2 = st.columns(2)
+    with col1:
+        st.write("How to Communicate with the chatbot.")
+        st.write("Type your question in the input box below and press Enter")
+        st.write(" ")
+    with col2:
+        st.write("(Recent Security Alerts)")
+        st.write("(Statistical Summary of Alerts)")
+        st.write("(Status Across Agents)")
+        st.write("(Vulnerabilities Across Agents)")
+        st.write("(Current Compliance Posture)")
+        st.write("(Current Active Threat Indicators)")
+        st.write("(Over-All System Health Metrics)")
+          
+    
 # --- Streamlit Setup ---
 st.set_page_config(page_title="Threat-Hawk Smart", layout="centered")
 
@@ -312,65 +363,11 @@ st.header("🛡️ Threat-Hawk Smart Monitoring")
 # Welcome message (always show but becomes scrollable when chat starts)
 with st.container():
     if not st.session_state.conversation_started and len(st.session_state.messages) == 0:
-        st.subheader('Welcome to Threat Hawk 🧠 Smart Monitoring System!')
-        st.markdown('''
-            Where you can Monitor your Network. By talking to our smart monitoring sytem and getting real time results.
-            Please follow the instructions below to get started:
-        ''')
-        st.subheader("Sample FAQ's ")
-        st.markdown("🕵️ : -Show me Active and non-Active Agents")
-        st.markdown("🕵️ : -Show me Critical Alerts in last 24 Hours")
-        st.markdown("🕵️ : -Show Over-all system Health ")
-          
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("-***Recent Alerts***")
-            st.write("-***Alert Summary***")
-            st.write("-***Agent Status***")
-            st.write("-***Critical Vulnerabilities***")
-            st.write("-***Compliance Status***")
-            st.write("-***Active Threats***")
-            st.write("-***System Health***")
-            
-        with col2:
-            st.write("(Recent Security Alerts)")
-            st.write("(Statistical Summary of Alerts)")
-            st.write("(Status Across Agents)")
-            st.write("(Vulnerabilities Across Agents)")
-            st.write("(Current Compliance Posture)")
-            st.write("(Current Active Threat Indicators)")
-            st.write("(Over-All System Health Metrics)")
+        main_page_setup()
     else:
         # Show compact welcome when chat is active
         with st.expander("📋 Welcome Guide (Click to expand)", expanded=True):
-            st.subheader('Welcome to Threat Hawk 🧠 Smart Monitoring System!')
-            st.markdown('''
-                Where you can Monitor your Network. By talking to our smart monitoring sytem and getting real time results.
-                Please follow the instructions below to get started:
-            ''')
-            st.subheader("Sample FAQ's ")
-            st.markdown("🕵️ : -Show me Active and non-Active Agents")
-            st.markdown("🕵️ : -Show me Critical Alerts in last 24 Hours")
-            st.markdown("🕵️ : -Show Over-all system Health ")
-              
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write("-***Recent Alerts***")
-                st.write("-***Alert Summary***")
-                st.write("-***Agent Status***")
-                st.write("-***Critical Vulnerabilities***")
-                st.write("-***Compliance Status***")
-                st.write("-***Active Threats***")
-                st.write("-***System Health***")
-                
-            with col2:
-                st.write("(Recent Security Alerts)")
-                st.write("(Statistical Summary of Alerts)")
-                st.write("(Status Across Agents)")
-                st.write("(Vulnerabilities Across Agents)")
-                st.write("(Current Compliance Posture)")
-                st.write("(Current Active Threat Indicators)")
-                st.write("(Over-All System Health Metrics)")
+            main_page_setup()
 
 # MCP Connection Setup
 async def setup_mcp():
@@ -409,35 +406,9 @@ def _convert_markdown_tables_to_html(text: str) -> str:
 
 # Inject compact CSS for content spacing
 st.markdown(
-    """
+    f"""
     <style>
-      :root {
-        --th-accent: #00d4aa;
-        --th-text: #e5e7eb;
-        --th-user-bg: #1f2937;
-        --th-assistant-bg: #334155;
-      }
-
-      .th-chat { line-height: 1.2; }
-      .th-chat p { margin: 2px 0; }
-      .th-chat ul, .th-chat ol { margin: 2px 0; padding-left: 16px; }
-      .th-chat li { margin: 0; }
-      .th-chat hr { margin: 6px 0; }
-      .th-chat table { width:100%; border-collapse: collapse; margin: 2px 0; }
-      .th-chat th, .th-chat td { border: 1px solid #475569; padding: 4px 8px; vertical-align: top; }
-      .th-chat thead th { background: #1f2937; }
-      .th-chat tbody tr:nth-child(odd) { background: rgba(255,255,255,0.02); }
-
-      .th-row { display:flex; align-items:flex-start; gap:6px; margin:6px 0; }
-      .th-row.user { justify-content:flex-start; }
-      .th-row.assistant { justify-content:flex-end; }
-      .th-avatar { font-size:20px; margin-top:2px; color:var(--th-accent); }
-
-      .th-bubble { max-width:80%; padding:6px 10px; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,0.25);
-                   font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size:15px; color:var(--th-text);
-                   overflow-wrap:anywhere; word-break:break-word; white-space:pre-line; }
-      .th-bubble.user { background:var(--th-user-bg); border-bottom-left-radius:8px; }
-      .th-bubble.assistant { background:var(--th-assistant-bg); border-bottom-right-radius:8px; }
+    {css_content}
     </style>
     """,
     unsafe_allow_html=True,
@@ -522,35 +493,73 @@ if prompt := st.chat_input("Ask me something..."):
 
     # Generate response
     async def handle_response():
-        # Check for new search trigger keywords
-        trigger_keywords = ("search", "find", "show", "get", "list", "display")
-        if (
-            st.session_state.get("last_data") 
-            and not any(prompt.lower().startswith(keyword) for keyword in trigger_keywords)
-        ):
-            # Follow-up mode: reuse last data with conversation context
-            context_data = st.session_state["last_data"]
+        previous_answer = st.session_state.get("last_data")
+        mcp_client = st.session_state.mcp_client
+        resource_list = "\n".join([f"- {desc}" for desc in mcp_client.resource_map.keys()])
+        is_followup = await mcp_client.is_follow_up(prompt, previous_answer, resource_list)
+        if not previous_answer:
+            print(f"[INFO] Is follow-up: {is_followup}, Previous answer: {previous_answer}")
+        else:
+            print(f"[INFO] Is follow-up: {is_followup}")
+        # Future: If is_followup and query is about vulnerabilities, trigger web search here
+        if is_followup and ("cve" in prompt.lower() and "remediation" in prompt.lower()):
+            # conversation_messages.append({"role": "user", "content": prompt})
+            print("[INFO] Triggering web search for CVE_ID...")                 #Debug Print
+            system_prompt = (f"""
+            You are a cybersecurity assistant specializing in vulnerability research and remediation.
+            I will provide a single CVE ID and its related package name if package name is available.
+            Here is CVE id in this prompt {prompt}  
+            Your task:
+                Search authoritative sources (NVD, MITRE, vendor advisories, security blogs, exploit databases, GitHub if applicable) for the latest technical details — verify accuracy and freshness.
+                Summarize the vulnerability in one short line (affected products, versions, severity, exploitability, public PoCs).
+                Output only a short, expert-facing Actions Taken checklist — no background, no explanations, no references.
+                Checklist rules:
+                Group into Immediate (Today), Fix (Within 48h), and Afterwards (Post-Remediation).
+                Each bullet must be a clear, concise past-tense action (e.g., “Applied patch”, “Rotated credentials”, “Isolated server”).
+                Avoid generic language — be specific to the CVE's context.
+                Instructions:
+
+                Input:
+                CVE: 
+                Package: if available
+                Output:
+
+                One-line CVE summary
+
+                """)
+
+            messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"User query: {prompt}"}
+            ]
+            completion = mcp_client.chat_client.chat.completions.create(
+            messages=messages,
+            max_completion_tokens=800,
+            temperature=0.7,
+            model=mcp_client.model_name
+            )
+            response = completion.choices[0].message.content.strip().lower()
+
+            st.session_state.memory.chat_memory.add_ai_message(response)
+            return response
+
+        if is_followup and previous_answer:
+            # Use previous context for follow-up
+            context_data = previous_answer
             system_prompt = f"""
                 You are a SOC analyst continuing a conversation with the user.
                 You have the following previously retrieved Threat-Hawk data:
-                
                 {context_data}
-
                 Answer the user's follow-up question based on this data and the conversation context.
                 If the data does not contain an answer, tell the user that.
                 Be conversational and reference previous parts of the conversation when relevant.
                 Replace Wazuh with Threathawk whenever you find it.
             """
-            
-            # Build conversation context
             conversation_messages = [
                 {"role": "system", "content": system_prompt}
-            ]
-            
-            # Add recent conversation history (last 10 messages to avoid token limits)
+                ]
             recent_messages = st.session_state.memory.chat_memory.messages[-10:]
             for msg in recent_messages:
-                # Map LangChain role types to OpenAI role types
                 role_mapping = {
                     'human': 'user',
                     'ai': 'assistant',
@@ -558,32 +567,30 @@ if prompt := st.chat_input("Ask me something..."):
                 }
                 mapped_role = role_mapping.get(msg.type, 'user')
                 conversation_messages.append({
-                    "role": mapped_role, 
+                    "role": mapped_role,
                     "content": msg.content
                 })
-            
             conversation_messages.append({"role": "user", "content": prompt})
-            
-            completion = st.session_state.mcp_client.chat_client.chat.completions.create(
+            completion = mcp_client.chat_client.chat.completions.create(
                 messages=conversation_messages,
                 max_completion_tokens=800,
                 temperature=0.7,
-                model=st.session_state.mcp_client.model_name
-            )
+                model=mcp_client.model_name
+                )
             response = completion.choices[0].message.content.strip()
         else:
-            # Fresh search mode
-            result = await st.session_state.mcp_client.process_query(prompt)
+            # New query
+            result = await mcp_client.process_query(prompt)
             if isinstance(result, dict) and "context" in result:
                 st.session_state["last_data"] = result["context"]
                 response = result.get("response", "")
             else:
                 st.session_state["last_data"] = result
                 response = result
-
         # Save assistant response to memory
         st.session_state.memory.chat_memory.add_ai_message(response)
         return response
+
 
     # Display assistant response
     with st.spinner("Thinking..."):

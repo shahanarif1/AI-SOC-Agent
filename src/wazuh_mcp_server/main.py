@@ -4469,9 +4469,9 @@ class WazuhMCPServer:
                             "agent_id": agent["id"],
                             "agent_name": agent.get("name"),
                             "vulnerability": vuln_info.get("description",""),
+                            "detected_at":vuln_info.get("detected_at", "N/A"),
                             "severity": severity,
                             "cve": vuln_info.get("id", "N/A") #----> id ---> cve
-                            # "peckage_name": package_.get("name", "N/A")
                         })
                 from wazuh_mcp_server.utils import get_logger
                 logger = get_logger(__name__)
